@@ -65,7 +65,11 @@ def split_section_text(
     max_chars: int,
     overlap_chars: int,
 ) -> list[str]:
-    """Split long section text into overlapping chunks without crossing sections."""
+    """Split long section text into overlapping chunks without crossing sections.
+
+    Chunk boundaries snap to paragraph or word breaks so chunks never start or
+    end mid-word (except when a single token exceeds ``max_chars``).
+    """
     text = text.strip()
     if not text:
         return []
@@ -79,14 +83,7 @@ def split_section_text(
     while start < text_len:
         end = min(start + max_chars, text_len)
         if end < text_len:
-            window = text[start:end]
-            para_break = window.rfind("\n\n")
-            if para_break > max_chars // 2:
-                end = start + para_break
-            else:
-                space_break = window.rfind(" ")
-                if space_break > max_chars // 2:
-                    end = start + space_break
+            end = _snap_end_to_boundary(text, start=start, end=end, max_chars=max_chars)
 
         chunk = text[start:end].strip()
         if chunk:
@@ -96,9 +93,46 @@ def split_section_text(
             break
 
         next_start = end - overlap_chars if overlap_chars > 0 else end
+        next_start = max(start + 1, next_start)
+        next_start = _snap_start_to_boundary(text, next_start)
+        # Guarantee forward progress even if snapping cannot find a boundary.
         start = max(start + 1, next_start)
 
     return chunks
+
+
+def _snap_end_to_boundary(text: str, *, start: int, end: int, max_chars: int) -> int:
+    """Prefer paragraph, then word, breaks when choosing a chunk end."""
+    window = text[start:end]
+    para_break = window.rfind("\n\n")
+    if para_break > max_chars // 2:
+        return start + para_break
+
+    # Any whitespace counts as a word boundary (spaces, newlines, tabs).
+    space_break = max(window.rfind(" "), window.rfind("\n"), window.rfind("\t"))
+    if space_break > max_chars // 2:
+        return start + space_break
+
+    return end
+
+
+def _snap_start_to_boundary(text: str, index: int) -> int:
+    """Move ``index`` forward to the start of the next word/paragraph if mid-token."""
+    text_len = len(text)
+    if index <= 0:
+        return 0
+    if index >= text_len:
+        return text_len
+
+    # Mid-word / mid-token: advance past the remainder of the current token.
+    if not text[index - 1].isspace():
+        while index < text_len and not text[index].isspace():
+            index += 1
+
+    # Skip whitespace so the chunk does not begin with spaces/newlines.
+    while index < text_len and text[index].isspace():
+        index += 1
+    return index
 
 
 def _parse_doc_id(doc_id: str) -> tuple[str, str]:

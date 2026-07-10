@@ -84,7 +84,37 @@ def test_split_section_text_applies_overlap():
     text = "alpha " * 80
     chunks = split_section_text(text, max_chars=200, overlap_chars=50)
     assert len(chunks) > 1
-    assert chunks[0][-50:] in chunks[1]
+    # Overlap is preserved at word boundaries (may be slightly less than raw chars).
+    assert any(token in chunks[1] for token in chunks[0].split()[-5:])
+
+
+def test_split_section_text_never_starts_mid_word():
+    # Dense text where a naive end-overlap lands inside a token (e.g. "Jaipur" → "ipur").
+    text = (
+        "Jaipur was founded in 1727 by Sawai Jai Singh II. "
+        "It is known as the Pink City of Rajasthan. "
+    ) * 40
+    chunks = split_section_text(text, max_chars=200, overlap_chars=50)
+    assert len(chunks) > 1
+
+    for chunk in chunks:
+        assert chunk == chunk.strip()
+        # Every chunk must begin at a word/paragraph boundary in the source.
+        pos = 0
+        found_clean = False
+        while True:
+            idx = text.find(chunk, pos)
+            if idx == -1:
+                break
+            if idx == 0 or text[idx - 1].isspace():
+                found_clean = True
+                break
+            pos = idx + 1
+        assert found_clean, f"chunk starts mid-token: {chunk[:40]!r}"
+
+    # Regression: classic mid-word truncations from the Jaipur corpus must not appear.
+    for chunk in chunks[1:]:
+        assert not chunk.startswith(("ipur ", "ipur.", "6.[", "tock ", "itage "))
 
 
 def test_chunking_is_deterministic():
