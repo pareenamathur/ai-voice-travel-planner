@@ -43,6 +43,10 @@ class TripConstraints(BaseModel):
     pace: str | None = None
     party_size: int | None = None
     mobility_notes: str | None = None
+    budget: str | None = None
+    travel_dates: str | None = None
+    food_preferences: list[str] = Field(default_factory=list)
+    transport_preferences: list[str] = Field(default_factory=list)
 
 
 class TaskMessage(BaseModel):
@@ -61,6 +65,8 @@ class PlanArtifact(BaseModel):
     poi_registry: dict[str, Any] = Field(default_factory=dict)
     rag_citations: list[dict[str, Any]] = Field(default_factory=list)
     correlation_id: str
+    constraints: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class EditScope(BaseModel):

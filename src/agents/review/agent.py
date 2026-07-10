@@ -1,62 +1,85 @@
-"""Review Agent — final quality gate for plan and edit workflows (Phase 7+)."""
+"""Review Agent stub — passthrough quality gate (Phase 4 Task 4)."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from pydantic import ValidationError
 
 from src.agents.base import BaseAgent
 from src.shared.messages.types import (
     AgentRole,
-    EditArtifact,
+    EvalReport,
     PlanArtifact,
-    RegenRequest,
-    ReviewRequest,
     ReviewStatus,
     ReviewVerdict,
 )
 
 
 class ReviewAgent(BaseAgent):
-    """
-    Runs Feasibility, Grounding, Edit Correctness evals.
-    Returns ReviewVerdict to Supervisor only. Phase 0: passthrough stub.
+    """Validate PlanArtifact and return ReviewVerdict(PASS).
+
+    Phase 4 Task 4 stub: no evaluations, no LLM, no Gateway, no regeneration.
+    Never user-facing — returns verdicts for the Supervisor only.
     """
 
     role = AgentRole.REVIEW
 
-    async def run(self, request: ReviewRequest) -> ReviewVerdict:
-        self._trace("review_started", request.correlation_id, artifact_type=request.artifact_type)
-        # Phase 7: run real evals + optional one regen
-        return ReviewVerdict(
+    async def run(self, artifact: PlanArtifact | dict[str, Any]) -> ReviewVerdict:
+        """Accept a PlanArtifact and always return a PASS ReviewVerdict."""
+        correlation_id = self._peek_correlation_id(artifact)
+        self._trace("review_started", correlation_id)
+
+        plan = self._validate_plan_artifact(artifact)
+        self._trace(
+            "artifact_validated",
+            plan.correlation_id,
+            artifact_type="plan",
+            has_itinerary=bool(plan.itinerary),
+        )
+
+        verdict = ReviewVerdict(
             status=ReviewStatus.PASS,
-            final_artifact=self._extract_artifact(request),
+            eval_report=EvalReport(entries=[]),
+            final_artifact=dict(plan.itinerary) if plan.itinerary else {},
             regen_attempted=False,
-            correlation_id=request.correlation_id,
+            correlation_id=plan.correlation_id,
         )
 
-    async def review_plan(self, artifact: PlanArtifact) -> ReviewVerdict:
-        return await self.run(
-            ReviewRequest(
-                artifact_type="plan",
-                plan_artifact=artifact,
-                session_id="",
-                correlation_id=artifact.correlation_id,
-            )
+        self._trace(
+            "review_completed",
+            plan.correlation_id,
+            status=verdict.status.value,
+            regen_attempted=False,
         )
+        return verdict
 
-    async def review_edit(self, artifact: EditArtifact) -> ReviewVerdict:
-        return await self.run(
-            ReviewRequest(
-                artifact_type="edit",
-                edit_artifact=artifact,
-                session_id="",
-                correlation_id=artifact.correlation_id,
-            )
+    async def review_plan(self, artifact: PlanArtifact | dict[str, Any]) -> ReviewVerdict:
+        """Alias for ``run`` — Planning → Review entry point."""
+        return await self.run(artifact)
+
+    def _validate_plan_artifact(self, artifact: PlanArtifact | dict[str, Any]) -> PlanArtifact:
+        if isinstance(artifact, PlanArtifact):
+            try:
+                return PlanArtifact.model_validate(artifact.model_dump(mode="json"))
+            except ValidationError as exc:
+                raise ValueError(f"invalid PlanArtifact: {exc}") from exc
+
+        if isinstance(artifact, dict):
+            try:
+                return PlanArtifact.model_validate(artifact)
+            except ValidationError as exc:
+                raise ValueError(f"invalid PlanArtifact: {exc}") from exc
+
+        raise ValueError(
+            f"Review Agent expects a PlanArtifact, got {type(artifact).__name__}"
         )
-
-    async def request_regen(self, regen: RegenRequest) -> None:
-        self._trace("regen_dispatch", regen.correlation_id, target=regen.target_agent.value)
 
     @staticmethod
-    def _extract_artifact(request: ReviewRequest) -> dict | None:
-        if request.plan_artifact:
-            return request.plan_artifact.itinerary
-        if request.edit_artifact:
-            return request.edit_artifact.itinerary
-        return None
+    def _peek_correlation_id(artifact: PlanArtifact | dict[str, Any]) -> str:
+        if isinstance(artifact, PlanArtifact):
+            return artifact.correlation_id
+        if isinstance(artifact, dict):
+            value = artifact.get("correlation_id")
+            return str(value) if value else ""
+        return ""

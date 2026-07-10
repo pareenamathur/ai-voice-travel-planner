@@ -29,12 +29,19 @@ class AgentRegistry:
         self.gateway = gateway
         self.observability = observability
 
-        self.supervisor = SupervisorAgent(llm, gateway, observability, session_manager)
         self.planning = PlanningAgent(llm, gateway, observability)
         self.knowledge = KnowledgeAgent(llm, gateway, observability)
         self.edit = EditAgent(llm, gateway, observability)
         self.export = ExportAgent(llm, gateway, observability)
         self.review = ReviewAgent(llm, gateway, observability)
+        self.supervisor = SupervisorAgent(
+            llm,
+            gateway,
+            observability,
+            session_manager,
+            planning=self.planning,
+            review=self.review,
+        )
 
         self._specialists: dict[AgentRole, BaseAgent] = {
             AgentRole.PLANNING: self.planning,

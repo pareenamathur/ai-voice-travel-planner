@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Any
 
+from src.api.config import settings
 from src.shared.messages.types import AgentRole
 
 
@@ -63,12 +64,12 @@ class LLMAdapter:
 
     def __init__(
         self,
-        model: str = "gpt-4o-mini",
-        provider: str = "openai",
+        model: str | None = None,
+        provider: str | None = None,
         agent_configs: dict[AgentRole, AgentLLMConfig] | None = None,
     ) -> None:
-        self.model = model
-        self.provider = provider
+        self.model = settings.chat_model if model is None else model
+        self.provider = settings.chat_provider if provider is None else provider
         self.agent_configs = agent_configs or DEFAULT_AGENT_CONFIGS
 
     def get_config(self, role: AgentRole) -> AgentLLMConfig:

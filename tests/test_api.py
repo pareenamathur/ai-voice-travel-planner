@@ -31,7 +31,10 @@ def test_session_message_routes_to_supervisor():
     data = response.json()
     assert "session_id" in data
     assert "correlation_id" in data
-    assert "Supervisor" in data["response"]
+    assert data["response"]
+    # Supervisor clarifies missing days after extracting city — no specialist routes.
+    assert "days" in data["response"].lower() or "understood" in data["response"].lower()
+    assert data["itinerary_approved"] is False
 
 
 def test_no_specialist_http_endpoints():

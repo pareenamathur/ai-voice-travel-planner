@@ -2,6 +2,7 @@
 
 from src.agents.registry import AgentRegistry
 from src.api.config import settings
+from src.mcp_servers.itinerary_builder import build_default_itinerary_service
 from src.mcp_servers.poi_search import build_default_poi_service
 from src.platform.llm.adapter import LLMAdapter
 from src.platform.mcp_gateway.gateway import MCPGateway
@@ -24,7 +25,11 @@ def get_registry() -> AgentRegistry:
         )
         gateway.register("search_pois", poi_service.search_pois)
 
-        llm = LLMAdapter(model=settings.llm_model, provider=settings.llm_provider)
+        itinerary_service = build_default_itinerary_service()
+        gateway.register("build_itinerary", itinerary_service.build_itinerary)
+        gateway.register("rebuild_day", itinerary_service.rebuild_day)
+
+        llm = LLMAdapter()
         _registry = AgentRegistry(session_manager, llm, gateway, observability)
     return _registry
 
