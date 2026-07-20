@@ -1,0 +1,44 @@
+{
+  "name": "missing_citation",
+  "description": "Degraded lookup with no grounding sources and no user disclaimer; fails grounding.",
+  "artifact_type": "plan",
+  "expected": {
+    "feasibility": "pass",
+    "grounding": "fail"
+  },
+  "artifact": {
+    "correlation_id": "fixture-missing-citation",
+    "rag_citations": [],
+    "poi_registry": {},
+    "itinerary": {
+      "city": "Jaipur",
+      "total_days": 1,
+      "traveler_constraints": {
+        "pace": "moderate"
+      },
+      "metadata": {
+        "live_poi_lookup": false
+      },
+      "poi_registry": [],
+      "citations": [],
+      "days": [
+        {
+          "day_number": 1,
+          "activities": [
+            {
+              "id": "d1-a1",
+              "title": "Old City Walking Tour",
+              "duration_minutes": 120
+            },
+            {
+              "id": "d1-a2",
+              "title": "Local Market Visit",
+              "duration_minutes": 90
+            }
+          ],
+          "travel_segments": []
+        }
+      ]
+    }
+  }
+}

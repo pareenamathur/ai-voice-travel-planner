@@ -443,11 +443,34 @@ After confirm, the Supervisor must not invent itineraries or call MCP tools. It 
 
 ---
 
+## ADR-019
+
+### Title
+Browser Web Speech API for Phase 5 STT
+
+### Status
+Accepted
+
+### Context
+Phase 5 Task 1 needs speech-to-text for the companion UI. Cloud STT (Deepgram, Whisper, Google, Azure) adds cost, keys, and server-side audio handling before any microphone UI exists.
+
+### Decision
+- Use the **browser Web Speech API** only (`SpeechRecognition` / `webkitSpeechRecognition`).
+- Keep recognition **fully client-side**; do not send audio or transcripts to the backend in Task 1.
+- Expose a reusable service + React hook (`startListening`, `stopListening`, `transcript`, `interimTranscript`, `isListening`, support detection, `error`).
+- Defer microphone UI and Supervisor API wiring to later Phase 5 tasks.
+
+### Consequences
+- Chrome/Edge (and Safari with webkit prefix) are the primary demo browsers; unsupported browsers surface `isSupported=false` / `error=not-supported`.
+- No STT API keys are required for Task 1 beyond the existing `STT_PROVIDER=browser` placeholder.
+- Cloud STT remains out of scope unless a future ADR revisits providers.
+
+---
+
 ## Future ADRs (placeholders)
 
 These will be decided in later phases and recorded here:
 
-- **ADR-019** — Voice provider (TBD)
 - **ADR-020** — Weather provider (TBD)
 - **ADR-021** — Travel time provider (TBD)
 - **ADR-022** — Deployment architecture (TBD)

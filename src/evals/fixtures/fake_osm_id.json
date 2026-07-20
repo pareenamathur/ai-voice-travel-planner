@@ -1,0 +1,63 @@
+{
+  "name": "fake_osm_id",
+  "description": "Activity references a fabricated POI id with no known source format; fails grounding.",
+  "artifact_type": "plan",
+  "expected": {
+    "feasibility": "pass",
+    "grounding": "fail"
+  },
+  "artifact": {
+    "correlation_id": "fixture-fake-osm-id",
+    "rag_citations": [],
+    "poi_registry": {
+      "fake:amber-fort-9999": {
+        "osm_id": "fake:amber-fort-9999",
+        "name": "Amber Fort",
+        "lat": 26.9855,
+        "lon": 75.8513,
+        "category": "sightseeing",
+        "source": "unknown"
+      }
+    },
+    "itinerary": {
+      "city": "Jaipur",
+      "total_days": 1,
+      "traveler_constraints": {
+        "pace": "moderate"
+      },
+      "metadata": {
+        "live_poi_lookup": true
+      },
+      "poi_registry": [
+        {
+          "poi_id": "fake:amber-fort-9999",
+          "name": "Amber Fort",
+          "latitude": 26.9855,
+          "longitude": 75.8513,
+          "category": "sightseeing",
+          "source": "unknown"
+        }
+      ],
+      "days": [
+        {
+          "day_number": 1,
+          "activities": [
+            {
+              "id": "d1-a1",
+              "title": "Amber Fort",
+              "poi_id": "fake:amber-fort-9999",
+              "duration_minutes": 90
+            },
+            {
+              "id": "d1-a2",
+              "title": "Secret Rooftop Palace",
+              "poi_id": "node/does-not-exist-1234",
+              "duration_minutes": 90
+            }
+          ],
+          "travel_segments": []
+        }
+      ]
+    }
+  }
+}

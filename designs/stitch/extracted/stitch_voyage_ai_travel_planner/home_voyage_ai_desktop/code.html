@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aether Voyage AI - Home</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@100;300;400;500;600;700;800;900&display=swap');
+        
+        body {
+            font-family: 'Geist', sans-serif;
+            background-color: #121212;
+            color: #e5e2e1;
+            overflow-x: hidden;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .glow-cyan {
+            box-shadow: 0 0 20px rgba(0, 238, 252, 0.3);
+        }
+
+        .glow-purple {
+            box-shadow: 0 0 30px rgba(189, 0, 255, 0.2);
+        }
+
+        .mic-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; box-shadow: 0 0 0 0 rgba(0, 238, 252, 0.7); }
+            50% { transform: scale(1.05); opacity: 0.8; box-shadow: 0 0 30px 10px rgba(0, 238, 252, 0); }
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+
+        .active-tab-indicator {
+            position: absolute;
+            right: 0;
+            width: 2px;
+            height: 24px;
+            background-color: #ecb2ff;
+        }
+
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-lowest": "#0e0e0e",
+                        "on-error-container": "#ffdad6",
+                        "on-tertiary-fixed-variant": "#663e00",
+                        "surface-variant": "#353534",
+                        "error-container": "#93000a",
+                        "on-tertiary-container": "#fffeff",
+                        "surface-container-low": "#1c1b1b",
+                        "tertiary": "#ffb961",
+                        "surface": "#131313",
+                        "surface-dim": "#131313",
+                        "tertiary-fixed-dim": "#ffb961",
+                        "surface-container-high": "#2a2a2a",
+                        "primary-fixed": "#f8d8ff",
+                        "background": "#131313",
+                        "on-background": "#e5e2e1",
+                        "primary-container": "#bd00ff",
+                        "inverse-surface": "#e5e2e1",
+                        "on-primary-container": "#ffffff",
+                        "tertiary-container": "#a66800",
+                        "outline-variant": "#514255",
+                        "inverse-on-surface": "#313030",
+                        "inverse-primary": "#9900cf",
+                        "on-primary": "#520071",
+                        "on-primary-fixed": "#320047",
+                        "error": "#ffb4ab",
+                        "surface-container": "#201f1f",
+                        "on-tertiary-fixed": "#2b1700",
+                        "surface-bright": "#393939",
+                        "on-tertiary": "#472a00",
+                        "secondary": "#d3fbff",
+                        "on-primary-fixed-variant": "#74009f",
+                        "surface-container-highest": "#353534",
+                        "on-secondary-fixed-variant": "#004f54",
+                        "tertiary-fixed": "#ffddb9",
+                        "primary-fixed-dim": "#ecb2ff",
+                        "secondary-container": "#00eefc",
+                        "primary": "#ecb2ff",
+                        "outline": "#9d8ba0",
+                        "surface-tint": "#ecb2ff",
+                        "on-secondary": "#00363a",
+                        "on-secondary-container": "#00686f",
+                        "secondary-fixed": "#7df4ff",
+                        "on-secondary-fixed": "#002022",
+                        "on-error": "#690005",
+                        "on-surface-variant": "#d4c0d7",
+                        "on-surface": "#e5e2e1",
+                        "secondary-fixed-dim": "#00dbe9"
+                    },
+                    "spacing": {
+                        "stack-sm": "12px",
+                        "stack-md": "24px",
+                        "stack-lg": "48px",
+                        "section-gap": "120px",
+                        "page-margin": "64px",
+                        "gutter": "32px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Geist"],
+                        "body-lg": ["Geist"],
+                        "mono-sm": ["Geist"],
+                        "headline-md": ["Geist"],
+                        "label-md": ["Geist"],
+                        "display-xl": ["Geist"],
+                        "body-md": ["Geist"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "letterSpacing": "0", "fontWeight": "400"}],
+                        "mono-sm": ["13px", {"lineHeight": "18px", "letterSpacing": "0", "fontWeight": "400"}],
+                        "headline-md": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "display-xl": ["72px", {"lineHeight": "80px", "letterSpacing": "-0.04em", "fontWeight": "700"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "letterSpacing": "0", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background min-h-screen flex overflow-hidden">
+<!-- BACKGROUND ATMOSPHERE -->
+<div class="fixed inset-0 pointer-events-none z-0">
+<div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-primary/10 blur-[120px]"></div>
+<div class="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-secondary-container/5 blur-[150px]"></div>
+</div>
+<!-- SIDE NAVBAR (JSON Integration) -->
+<aside class="h-screen w-64 fixed left-0 top-0 flex flex-col p-stack-md border-r border-white/10 bg-surface/40 dark:bg-surface-container-low/40 backdrop-blur-xl shadow-[0_20px_40px_-10px_rgba(189,0,255,0.2)] z-50">
+<div class="mb-stack-lg px-2">
+<h1 class="font-headline-md text-headline-md font-semibold bg-gradient-to-br from-primary to-secondary bg-clip-text text-transparent">Aether Travel</h1>
+<p class="font-body-md text-body-md text-on-surface-variant opacity-70">Premium AI Planning</p>
+</div>
+<nav class="flex-1 space-y-2">
+<!-- New Trip (Active) -->
+<a class="flex items-center gap-3 px-4 py-3 text-primary font-bold border-r-2 border-primary bg-white/5 transition-all duration-300 active:scale-95 group" href="#">
+<span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+<span class="font-body-md text-body-md">New Trip</span>
+</a>
+<!-- Recent Trips -->
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-body-md hover:text-on-surface hover:bg-white/10 transition-all duration-300 active:scale-95 group" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+<span class="font-body-md text-body-md">Recent Trips</span>
+</a>
+<!-- Saved Itineraries -->
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-body-md hover:text-on-surface hover:bg-white/10 transition-all duration-300 active:scale-95 group" href="#">
+<span class="material-symbols-outlined" data-icon="bookmark">bookmark</span>
+<span class="font-body-md text-body-md">Saved Itineraries</span>
+</a>
+<!-- Settings -->
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant font-body-md hover:text-on-surface hover:bg-white/10 transition-all duration-300 active:scale-95 group" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Settings</span>
+</a>
+</nav>
+<div class="mt-auto pt-stack-md">
+<button class="w-full py-4 rounded-xl bg-gradient-to-r from-primary-container to-secondary-container text-white font-semibold shadow-lg hover:brightness-110 active:scale-95 transition-all">
+                Upgrade to Pro
+            </button>
+<div class="mt-6 flex items-center gap-3 px-2">
+<img class="w-10 h-10 rounded-full border border-white/20" data-alt="A professional headshot of a user with a soft cosmic blue backlighting, looking sophisticated and tech-forward. High quality cinematic photography, shallow depth of field, minimalist aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3DzC0xWQdIujjnLxa0XyJMaQG7Uw9Zf8WNyC0YdlRHBv5CEO9YosTpUh6kyjLoGBCGeD6AKMRjuUyyo5BXN25T0j5hOb45ezGdAU15UFKWh_XPhjY5mQL586OARm-rTXf7BLd7nkwWfLVGUZCcj7TdYe0HhZhOt4XC59VEX1uKWC_GxE2fkMISDZCa84qC7v9-Wq6jQGqmwQm1vyq2Ol5sDlUD7uyfY7oSB3qCeoFk_hnBW1PEUI-"/>
+<div class="overflow-hidden">
+<p class="font-label-md text-label-md truncate">Alex Sterling</p>
+<p class="text-xs text-on-surface-variant">Voyager Level</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- TOP NAVBAR (JSON Integration) -->
+<header class="fixed top-0 right-0 left-64 h-20 flex justify-end items-center px-page-margin py-stack-sm bg-transparent z-40">
+<div class="flex items-center gap-6">
+<div class="relative group">
+<input class="bg-white/5 border-none focus:ring-1 focus:ring-secondary-container/50 rounded-full py-2 px-6 w-64 text-label-md transition-all" placeholder="Search destinations..." type="text"/>
+<span class="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-sm">search</span>
+</div>
+<div class="flex items-center gap-4 text-on-surface-variant">
+<button class="material-symbols-outlined hover:text-secondary transition-colors" data-icon="notifications">notifications</button>
+<button class="material-symbols-outlined hover:text-secondary transition-colors" data-icon="account_circle">account_circle</button>
+</div>
+</div>
+</header>
+<!-- MAIN CONTENT CANVAS -->
+<main class="flex-1 ml-64 p-page-margin pt-32 overflow-y-auto h-screen relative z-10">
+<!-- HEADER SECTION -->
+<div class="max-w-4xl mx-auto mb-section-gap text-center">
+<h2 class="font-display-xl text-display-xl mb-4 bg-gradient-to-r from-white to-white/40 bg-clip-text text-transparent">Plan your perfect trip with AI</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto">
+                Speak your desires into existence. Our neural engine crafts bespoke journeys across the globe, tailored to your exact rhythm.
+            </p>
+</div>
+<!-- VOICE INPUT CARD -->
+<section class="max-w-3xl mx-auto mb-section-gap">
+<div class="glass-panel p-12 rounded-[32px] flex flex-col items-center justify-center text-center relative overflow-hidden">
+<!-- Background decoration -->
+<div class="absolute inset-0 bg-gradient-to-b from-secondary-container/5 to-transparent opacity-20"></div>
+<div class="relative z-10 mb-8">
+<button class="w-32 h-32 rounded-full bg-gradient-to-br from-primary-container to-secondary-container p-[2px] mic-pulse group" id="mic-btn">
+<div class="w-full h-full rounded-full bg-surface-container flex items-center justify-center">
+<span class="material-symbols-outlined text-5xl text-secondary-container group-hover:scale-110 transition-transform" data-weight="fill">mic</span>
+</div>
+</button>
+</div>
+<div class="relative z-10 space-y-2">
+<h3 class="font-headline-md text-headline-md text-secondary-container">Listening...</h3>
+<p class="font-body-md text-body-md text-on-surface-variant italic">"I want to go to a snowy mountain cabin in Hokkaido next February..."</p>
+</div>
+<!-- Visualizer Mockup -->
+<div class="flex items-center justify-center gap-1 mt-10 h-8">
+<div class="w-1 bg-secondary-container rounded-full h-4 animate-[bounce_1s_infinite]"></div>
+<div class="w-1 bg-secondary-container rounded-full h-8 animate-[bounce_1.2s_infinite]"></div>
+<div class="w-1 bg-secondary-container rounded-full h-6 animate-[bounce_0.8s_infinite]"></div>
+<div class="w-1 bg-secondary-container rounded-full h-10 animate-[bounce_1.5s_infinite]"></div>
+<div class="w-1 bg-secondary-container rounded-full h-4 animate-[bounce_1.1s_infinite]"></div>
+<div class="w-1 bg-secondary-container rounded-full h-8 animate-[bounce_0.9s_infinite]"></div>
+<div class="w-1 bg-secondary-container rounded-full h-5 animate-[bounce_1.3s_infinite]"></div>
+</div>
+</div>
+</section>
+<!-- RECENT TRIPS GALLERY -->
+<section class="max-w-6xl mx-auto pb-16">
+<div class="flex justify-between items-end mb-8">
+<h4 class="font-headline-md text-headline-md">Recent Trips</h4>
+<a class="text-primary hover:underline font-label-md flex items-center gap-1" href="#">
+                    View all history <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+<!-- PARIS CARD -->
+<div class="group relative overflow-hidden rounded-[24px] h-[400px] glass-panel cursor-pointer">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110" data-alt="A cinematic, high-contrast shot of the Eiffel Tower seen from a minimalist Parisian balcony at blue hour. The city lights are twinkling, creating a dreamy cyan and purple atmosphere. Professional travel photography with elegant lighting and rich shadows, evoking a sense of European luxury." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDB-wYKmAMyZT2YBxgNHHJUUjhl53hKxnU1lWQyp_rCfKZ6hTuGnJ6FID8o2PM7pEQeldnlBRRWXLBznNjACefHmUIgry8koLDJAT8wkHmY58SIL8njjTKYijtCxniTU66tReTD4zpqpMOidRonBl5KEwPI4AGdmdLbTWD5pjrmtH8iD3hfbSuSq2jydfJbYFv0lCfoyXl8yjbiEE-ptmVlAJ0rgSTCuIW97OC9rz2FFM4BsvvwHyHR')">
+</div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
+<div class="absolute bottom-0 left-0 p-8 w-full flex justify-between items-end">
+<div>
+<span class="inline-block px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-label-md text-white border border-white/20 mb-3">EUROPEAN</span>
+<h5 class="text-3xl font-bold text-white mb-1">Parisian Escape</h5>
+<p class="text-white/70 font-body-md">7 Days • 14 Destinations explored</p>
+</div>
+<button class="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white hover:text-black transition-all">
+<span class="material-symbols-outlined">visibility</span>
+</button>
+</div>
+</div>
+<!-- TOKYO CARD -->
+<div class="group relative overflow-hidden rounded-[24px] h-[400px] glass-panel cursor-pointer">
+<div class="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110" data-alt="A vibrant, futuristic street scene in Tokyo's Shinjuku district at night. Neon signs in shades of cyan, magenta, and purple reflect off rain-slicked pavement. The aesthetic is tech-noir and cinematic, with sharp details and deep contrast. Busy yet orderly, capturing the essence of modern Asian urban life." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAgaXrYes4nrTu4vdoqbtTfkbP871fJDOFM6zJsgmJ8ENLhgppL0u80YoB247t9_SoMcW4IWsLSdpxcBYSaPiFbd1UM78hN6NMBBuZ0RCCSu_CAGgIHlyVBU0aPgLXUml7Z_zVOZwsLS2SaQ5THAM5EZTRoEtWsmfb7AL4A8vbze14ybucB5k6fMQIx9W19JeKvwo_EutMaSfeQFreQrZtmtnvH3KQ_ix5HAcKO4GGJvJjWBJypERME')">
+</div>
+<div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
+<div class="absolute bottom-0 left-0 p-8 w-full flex justify-between items-end">
+<div>
+<span class="inline-block px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-label-md text-white border border-white/20 mb-3">ASIAN</span>
+<h5 class="text-3xl font-bold text-white mb-1">Neon Tokyo</h5>
+<p class="text-white/70 font-body-md">12 Days • 32 Destinations explored</p>
+</div>
+<button class="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white hover:text-black transition-all">
+<span class="material-symbols-outlined">visibility</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- MIC INTERACTION SCRIPT -->
+<script>
+        document.getElementById('mic-btn').addEventListener('click', function() {
+            const statusText = document.querySelector('h3');
+            const bars = document.querySelectorAll('.animate-\\[bounce_');
+            
+            if (statusText.innerText === "Listening...") {
+                statusText.innerText = "Processing Journey...";
+                statusText.classList.remove('text-secondary-container');
+                statusText.classList.add('text-primary');
+                this.classList.remove('mic-pulse');
+            } else {
+                statusText.innerText = "Listening...";
+                statusText.classList.add('text-secondary-container');
+                statusText.classList.remove('text-primary');
+                this.classList.add('mic-pulse');
+            }
+        });
+
+        // Hover effect for nav items
+        const navItems = document.querySelectorAll('nav a');
+        navItems.forEach(item => {
+            item.addEventListener('mouseenter', () => {
+                if(!item.classList.contains('text-primary')) {
+                    item.style.backgroundColor = 'rgba(255,255,255,0.05)';
+                }
+            });
+            item.addEventListener('mouseleave', () => {
+                if(!item.classList.contains('text-primary')) {
+                    item.style.backgroundColor = 'transparent';
+                }
+            });
+        });
+    </script>
+</body></html>

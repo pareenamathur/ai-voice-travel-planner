@@ -1,0 +1,246 @@
+.itinerary-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  color: var(--on-surface, #e5e2e1);
+  font-family: var(--font, "Geist", system-ui, sans-serif);
+}
+
+.itinerary-view__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.itinerary-view__header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.itinerary-view__city {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-transform: capitalize;
+}
+
+.itinerary-view__days {
+  margin: 0;
+  color: var(--on-surface-variant, #d4c0d7);
+  font-size: 0.95rem;
+  opacity: 0.75;
+}
+
+.itinerary-view__empty {
+  margin: 0;
+  padding: 1.25rem 1.5rem;
+  border-radius: 1rem;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--on-surface-variant, #d4c0d7);
+}
+
+.itinerary-view__days-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.day-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.day-card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem 1.25rem;
+}
+
+.day-card__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.day-card__date,
+.day-card__notes {
+  margin: 0;
+  color: var(--on-surface-variant, #d4c0d7);
+  opacity: 0.7;
+  font-size: 0.95rem;
+}
+
+.day-card__empty {
+  margin: 0;
+  color: var(--on-surface-variant, #d4c0d7);
+  font-style: italic;
+}
+
+.day-card__timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.day-card__item {
+  position: relative;
+  padding-left: 3.5rem;
+}
+
+.day-card__item::before {
+  content: "";
+  position: absolute;
+  left: 1.15rem;
+  top: 2.5rem;
+  bottom: -1.75rem;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--primary, #ecb2ff) 50%, transparent),
+    transparent
+  );
+}
+
+.day-card__item:last-child::before {
+  display: none;
+}
+
+.activity-card {
+  position: relative;
+  display: grid;
+  gap: 0.65rem;
+  padding: 1.75rem;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(16px);
+  transition: border-color 0.25s, background 0.25s, transform 0.2s;
+}
+
+.activity-card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateY(-2px);
+}
+
+.activity-card::before {
+  content: "";
+  position: absolute;
+  left: -3.5rem;
+  top: 0.15rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.activity-card__period {
+  display: inline-flex;
+  align-self: start;
+  margin: 0;
+  padding: 0.25rem 0.65rem;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--on-surface, #e5e2e1);
+}
+
+.activity-card__title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.activity-card__time,
+.activity-card__duration,
+.activity-card__category,
+.activity-card__notes {
+  margin: 0;
+  color: var(--on-surface-variant, #d4c0d7);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.activity-card__time {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  letter-spacing: 0.03em;
+}
+
+.activity-card__category {
+  display: inline-flex;
+  align-self: start;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 238, 252, 0.25);
+  color: var(--secondary-container, #00eefc);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: capitalize;
+}
+
+.travel-segment {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.85rem;
+  margin: 0.35rem 0 0.15rem;
+  padding: 0.35rem 0;
+  color: var(--on-surface-variant, #d4c0d7);
+  font-size: 0.875rem;
+  font-style: italic;
+  opacity: 0.75;
+}
+
+.travel-segment__time {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--secondary-container, #00eefc);
+}
+
+.travel-segment__mode {
+  text-transform: lowercase;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .day-card__item {
+    padding-left: 2.75rem;
+  }
+
+  .activity-card::before {
+    left: -2.75rem;
+    width: 2rem;
+    height: 2rem;
+  }
+}

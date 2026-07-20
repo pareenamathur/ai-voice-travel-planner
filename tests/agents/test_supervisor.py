@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
+from src.agents.planning.agent import LIVE_POI_UNAVAILABLE_NOTE, PlanningAgent
+from src.agents.review.agent import ReviewAgent
 from src.agents.supervisor.agent import SupervisorAgent
-from src.agents.supervisor.intent import classify_intent, is_explicit_confirmation, is_greeting
+from src.agents.supervisor.intent import (
+    classify_intent,
+    is_explicit_confirmation,
+    is_greeting,
+)
 from src.agents.supervisor.slots import (
     extract_slots,
     has_sufficient_constraints,
@@ -13,7 +21,15 @@ from src.agents.supervisor.slots import (
 from src.platform.llm.adapter import LLMAdapter
 from src.platform.observability.tracer import Observability
 from src.platform.session.manager import SessionManager
-from src.shared.messages.types import ConversationPhase, TaskType, TripConstraints
+from src.shared.messages.types import (
+    ConversationPhase,
+    EvalReport,
+    PlanArtifact,
+    ReviewStatus,
+    ReviewVerdict,
+    TaskType,
+    TripConstraints,
+)
 
 
 @pytest.fixture
@@ -51,6 +67,51 @@ def test_is_explicit_confirmation():
     assert is_explicit_confirmation("generate")
     assert not is_explicit_confirmation("yes but change the city")
     assert not is_explicit_confirmation("Plan a 3-day trip")
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "yes?",
+        "yes,",
+        "Yes please",
+        "yeah thanks",
+        "ok thank you",
+        "yes\u200b",
+    ],
+)
+def test_is_explicit_confirmation_speech_variants(message: str):
+    """Web Speech often appends punctuation or politeness after short affirmatives."""
+    assert is_explicit_confirmation(message)
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "yes yes",
+        "yes yes yes",
+        "yeah yeah",
+        "ok ok",
+        "sure sure please",
+        "yes yes?",
+        "yes yes thanks",
+    ],
+)
+def test_is_explicit_confirmation_repeated_affirmatives(message: str):
+    """Spoken stutters like 'yes yes' must normalize to a single affirmative."""
+    assert is_explicit_confirmation(message)
+
+
+def test_normalize_confirmation_collapses_repeated_affirmatives():
+    from src.agents.supervisor.intent import normalize_confirmation_text
+
+    assert normalize_confirmation_text("yes yes") == "yes"
+    assert normalize_confirmation_text("yes yes yes") == "yes"
+    assert normalize_confirmation_text("YEAH   YEAH") == "yeah"
+    assert normalize_confirmation_text("ok ok") == "ok"
+    assert normalize_confirmation_text("sure sure please") == "sure please"
+    assert normalize_confirmation_text("yes yes?") == "yes?"
+    assert normalize_confirmation_text("yes yes thanks") == "yes thanks"
 
 
 def test_extract_slots_from_rich_message():
@@ -184,6 +245,117 @@ async def test_clarification_limit_stops_new_questions(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("confirmation", ["yes", "yes?", "Yes please", "yes,", "yes yes"])
+async def test_confirm_phase_transitions_to_plan_with_speech_variants(
+    sessions: SessionManager,
+    obs: Observability,
+    confirmation: str,
+):
+    """Regression: confirm-phase affirmatives must create TaskMessage(PLAN), not re-confirm."""
+    planning = AsyncMock(spec=PlanningAgent)
+    planning.run = AsyncMock(
+        return_value=PlanArtifact(
+            itinerary={"city": "Jaipur", "total_days": 2, "days": []},
+            correlation_id="corr-plan",
+        )
+    )
+    review = AsyncMock(spec=ReviewAgent)
+    review.run = AsyncMock(
+        return_value=ReviewVerdict(
+            status=ReviewStatus.PASS,
+            eval_report=EvalReport(entries=[]),
+            final_artifact={"city": "Jaipur", "total_days": 2, "days": []},
+            regen_attempted=False,
+            correlation_id="corr-plan",
+        )
+    )
+    supervisor = SupervisorAgent(
+        llm=LLMAdapter(),
+        gateway=None,
+        observability=obs,
+        session_manager=sessions,
+        planning=planning,
+        review=review,
+    )
+
+    confirm = await supervisor.handle_message(
+        None,
+        "Plan a 2-day trip to Jaipur",
+        correlation_id="corr-confirm-variant",
+    )
+    assert confirm["intent"] == TaskType.CONFIRM.value
+    assert sessions.read(confirm["session_id"]).conversation_phase == ConversationPhase.CONFIRM
+
+    plan = await supervisor.handle_message(
+        confirm["session_id"],
+        confirmation,
+        correlation_id="corr-plan-variant",
+    )
+
+    assert plan["intent"] == TaskType.PLAN.value
+    assert plan["task_message"] is not None
+    assert plan["task_message"]["task_type"] == TaskType.PLAN.value
+    assert sessions.read(confirm["session_id"]).conversation_phase == ConversationPhase.ACTIVE
+    planning.run.assert_awaited_once()
+    review.run.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_approved_response_includes_live_poi_unavailable_note(
+    sessions: SessionManager,
+    obs: Observability,
+):
+    planning = AsyncMock(spec=PlanningAgent)
+    planning.run = AsyncMock(
+        return_value=PlanArtifact(
+            itinerary={
+                "city": "Jaipur",
+                "total_days": 2,
+                "days": [{"day_number": 1, "activities": [{"title": "City Palace"}]}],
+                "metadata": {
+                    "live_poi_lookup": False,
+                    "user_note": LIVE_POI_UNAVAILABLE_NOTE,
+                },
+            },
+            correlation_id="corr-degraded",
+            metadata={"live_poi_lookup": False},
+        )
+    )
+    review = AsyncMock(spec=ReviewAgent)
+    review.run = AsyncMock(
+        return_value=ReviewVerdict(
+            status=ReviewStatus.PASS,
+            eval_report=EvalReport(entries=[]),
+            final_artifact={
+                "city": "Jaipur",
+                "total_days": 2,
+                "days": [{"day_number": 1, "activities": [{"title": "City Palace"}]}],
+                "metadata": {
+                    "live_poi_lookup": False,
+                    "user_note": LIVE_POI_UNAVAILABLE_NOTE,
+                },
+            },
+            regen_attempted=False,
+            correlation_id="corr-degraded",
+        )
+    )
+    supervisor = SupervisorAgent(
+        llm=LLMAdapter(),
+        gateway=None,
+        observability=obs,
+        session_manager=sessions,
+        planning=planning,
+        review=review,
+    )
+
+    confirm = await supervisor.handle_message(None, "Plan a 2-day trip to Jaipur")
+    plan = await supervisor.handle_message(confirm["session_id"], "yes")
+
+    assert LIVE_POI_UNAVAILABLE_NOTE in plan["response"]
+    assert "Live place lookup was temporarily unavailable" in plan["response"]
+
+
+@pytest.mark.asyncio
 async def test_confirmation_summary_then_plan_requires_agents(
     supervisor: SupervisorAgent,
     sessions: SessionManager,
@@ -265,3 +437,42 @@ async def test_multi_turn_slot_merge(supervisor: SupervisorAgent, sessions: Sess
     assert session.trip_constraints.days == 4
     assert "shopping" in session.trip_constraints.interests
     assert second["intent"] == TaskType.CONFIRM.value
+
+
+def test_classify_intent_edit_when_itinerary_approved():
+    constraints = TripConstraints(city="Jaipur", days=2)
+    intent = classify_intent(
+        message="Make Day 2 more relaxing",
+        constraints=constraints,
+        phase=ConversationPhase.ACTIVE,
+        has_sufficient=True,
+        has_itinerary=True,
+        itinerary_approved=True,
+    )
+    assert intent == TaskType.EDIT
+
+
+def test_classify_intent_explain_when_itinerary_present():
+    constraints = TripConstraints(city="Jaipur", days=2)
+    intent = classify_intent(
+        message="Tell me more about Amber Fort",
+        constraints=constraints,
+        phase=ConversationPhase.ACTIVE,
+        has_sufficient=True,
+        has_itinerary=True,
+        itinerary_approved=True,
+    )
+    assert intent == TaskType.EXPLAIN
+
+
+def test_classify_intent_edit_requires_approval():
+    constraints = TripConstraints(city="Jaipur", days=2)
+    intent = classify_intent(
+        message="Make Day 2 more relaxing",
+        constraints=constraints,
+        phase=ConversationPhase.ACTIVE,
+        has_sufficient=True,
+        has_itinerary=True,
+        itinerary_approved=False,
+    )
+    assert intent == TaskType.CONFIRM

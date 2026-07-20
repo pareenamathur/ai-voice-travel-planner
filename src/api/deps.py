@@ -8,6 +8,7 @@ from src.platform.llm.adapter import LLMAdapter
 from src.platform.mcp_gateway.gateway import MCPGateway
 from src.platform.observability.tracer import Observability
 from src.platform.session.manager import SessionManager
+from src.rag.guidance import retrieve_guidance
 
 _registry: AgentRegistry | None = None
 
@@ -20,14 +21,16 @@ def get_registry() -> AgentRegistry:
         gateway = MCPGateway(observability=observability)
 
         poi_service = build_default_poi_service(
-            overpass_api_url=settings.overpass_api_url,
+            overpass_urls=settings.overpass_urls(),
             cache_dir=settings.osm_cache_dir,
+            city_cache_ttl_seconds=settings.poi_city_cache_ttl_seconds,
         )
         gateway.register("search_pois", poi_service.search_pois)
 
         itinerary_service = build_default_itinerary_service()
         gateway.register("build_itinerary", itinerary_service.build_itinerary)
         gateway.register("rebuild_day", itinerary_service.rebuild_day)
+        gateway.register("retrieve_guidance", retrieve_guidance)
 
         llm = LLMAdapter()
         _registry = AgentRegistry(session_manager, llm, gateway, observability)

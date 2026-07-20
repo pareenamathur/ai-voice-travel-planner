@@ -8,7 +8,7 @@ import pytest
 from src.agents.review.agent import ReviewAgent
 from src.platform.llm.adapter import LLMAdapter
 from src.platform.observability.tracer import Observability
-from src.shared.messages.types import PlanArtifact, ReviewStatus, ReviewVerdict
+from src.shared.messages.types import EditArtifact, EditScope, PlanArtifact, ReviewStatus, ReviewVerdict
 
 
 def _valid_artifact(**overrides) -> PlanArtifact:
@@ -130,3 +130,18 @@ async def test_observability_spans(review: ReviewAgent, obs: Observability):
     assert all(span.get("correlation_id") == "corr-review-1" for span in spans)
     assert all(span.get("agent") == "review" for span in spans)
     assert spans[-1]["status"] == "pass"
+
+
+@pytest.mark.asyncio
+async def test_valid_edit_artifact_returns_pass(review: ReviewAgent):
+    artifact = EditArtifact(
+        itinerary={"city": "Jaipur", "total_days": 2, "days": []},
+        edit_scope=EditScope(day=2, intent="relax_day"),
+        before_snapshot={"city": "Jaipur", "total_days": 2, "days": []},
+        correlation_id="corr-edit-review",
+    )
+    verdict = await review.review_edit(artifact)
+
+    assert verdict.status == ReviewStatus.PASS
+    assert verdict.final_artifact == artifact.itinerary
+    assert verdict.correlation_id == "corr-edit-review"

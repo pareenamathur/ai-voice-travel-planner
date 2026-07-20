@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Voyage AI | Jaipur Itinerary</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap');
+        
+        body {
+            font-family: 'Geist', sans-serif;
+            background-color: #121212;
+            color: #e5e2e1;
+            overflow-x: hidden;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(236, 178, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #ecb2ff 0%, #00eefc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .timeline-connector {
+            position: absolute;
+            left: 20px;
+            top: 40px;
+            bottom: -20px;
+            width: 1px;
+            background: linear-gradient(to bottom, rgba(236, 178, 255, 0.5), transparent);
+        }
+
+        .glow-accent {
+            box-shadow: 0 0 20px rgba(236, 178, 255, 0.15);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "surface-container-lowest": "#0e0e0e",
+                      "on-error-container": "#ffdad6",
+                      "on-tertiary-fixed-variant": "#663e00",
+                      "surface-variant": "#353534",
+                      "error-container": "#93000a",
+                      "on-tertiary-container": "#fffeff",
+                      "surface-container-low": "#1c1b1b",
+                      "tertiary": "#ffb961",
+                      "surface": "#131313",
+                      "surface-dim": "#131313",
+                      "tertiary-fixed-dim": "#ffb961",
+                      "surface-container-high": "#2a2a2a",
+                      "primary-fixed": "#f8d8ff",
+                      "background": "#131313",
+                      "on-background": "#e5e2e1",
+                      "primary-container": "#bd00ff",
+                      "inverse-surface": "#e5e2e1",
+                      "on-primary-container": "#ffffff",
+                      "tertiary-container": "#a66800",
+                      "outline-variant": "#514255",
+                      "inverse-on-surface": "#313030",
+                      "inverse-primary": "#9900cf",
+                      "on-primary": "#520071",
+                      "on-primary-fixed": "#320047",
+                      "error": "#ffb4ab",
+                      "surface-container": "#201f1f",
+                      "on-tertiary-fixed": "#2b1700",
+                      "surface-bright": "#393939",
+                      "on-tertiary": "#472a00",
+                      "secondary": "#d3fbff",
+                      "on-primary-fixed-variant": "#74009f",
+                      "surface-container-highest": "#353534",
+                      "on-secondary-fixed-variant": "#004f54",
+                      "tertiary-fixed": "#ffddb9",
+                      "primary-fixed-dim": "#ecb2ff",
+                      "secondary-container": "#00eefc",
+                      "primary": "#ecb2ff",
+                      "outline": "#9d8ba0",
+                      "surface-tint": "#ecb2ff",
+                      "on-secondary": "#00363a",
+                      "on-secondary-container": "#00686f",
+                      "secondary-fixed": "#7df4ff",
+                      "on-secondary-fixed": "#002022",
+                      "on-error": "#690005",
+                      "on-surface-variant": "#d4c0d7",
+                      "on-surface": "#e5e2e1",
+                      "secondary-fixed-dim": "#00dbe9"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "stack-sm": "12px",
+                      "stack-md": "24px",
+                      "stack-lg": "48px",
+                      "section-gap": "120px",
+                      "page-margin": "64px",
+                      "gutter": "32px"
+              },
+              "fontFamily": {
+                      "headline-lg": ["Geist"],
+                      "body-lg": ["Geist"],
+                      "mono-sm": ["Geist"],
+                      "headline-md": ["Geist"],
+                      "label-md": ["Geist"],
+                      "display-xl": ["Geist"],
+                      "body-md": ["Geist"]
+              },
+              "fontSize": {
+                      "headline-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "body-lg": ["18px", {"lineHeight": "28px", "letterSpacing": "0", "fontWeight": "400"}],
+                      "mono-sm": ["13px", {"lineHeight": "18px", "letterSpacing": "0", "fontWeight": "400"}],
+                      "headline-md": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                      "display-xl": ["72px", {"lineHeight": "80px", "letterSpacing": "-0.04em", "fontWeight": "700"}],
+                      "body-md": ["16px", {"lineHeight": "24px", "letterSpacing": "0", "fontWeight": "400"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background">
+<!-- WebGL Background Placeholder -->
+
+<!-- Side Navigation Bar -->
+<aside class="flex flex-col h-full p-stack-md bg-surface/40 dark:bg-surface-container-low/40 backdrop-blur-xl h-screen w-64 fixed left-0 top-0 border-r border-white/10 shadow-[0_20px_40px_-10px_rgba(189,0,255,0.2)] z-50">
+<div class="mb-10">
+<h1 class="font-headline-md text-headline-md font-semibold bg-gradient-to-br from-primary to-secondary bg-clip-text text-transparent">Aether Travel</h1>
+<p class="font-body-md text-body-md text-on-surface-variant opacity-70">Premium AI Planning</p>
+</div>
+<nav class="flex-1 space-y-4">
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant font-body-md hover:text-on-surface hover:bg-white/10 transition-all duration-300 active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined">add_circle</span>
+<span>New Trip</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-primary font-bold border-r-2 border-primary bg-white/5 hover:bg-white/10 transition-all duration-300 active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined">history</span>
+<span>Recent Trips</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant font-body-md hover:text-on-surface hover:bg-white/10 transition-all duration-300 active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined" data-weight="fill">bookmark</span>
+<span>Saved Itineraries</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant font-body-md hover:text-on-surface hover:bg-white/10 transition-all duration-300 active:scale-95 transition-transform" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Settings</span>
+</a>
+</nav>
+<div class="mt-auto">
+<button class="w-full py-4 rounded-xl bg-gradient-to-r from-primary-container to-secondary-container text-on-primary-container font-semibold shadow-lg hover:brightness-110 transition-all active:scale-95">
+                Upgrade to Pro
+            </button>
+<div class="mt-6 flex items-center gap-3 px-2">
+<img class="w-10 h-10 rounded-full border border-white/20" data-alt="Close up professional portrait of a tech-savvy traveler with a warm smile, soft cinematic studio lighting with purple and cyan rim lights, high detail digital photography style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAeSh4m8urOg3wVNZIaPLYFrg31L42-2itpiLJ5xUzSw7zcUFWisDMQ7hCyscVOJI5HY19AdNXhhtyvEN4ur2JSmIittkNDfM7X2-UHIiUUNH-IJ98WSzUzTWzvJDuhOFiI5uv94UtJ9_0Din8fTBY5NP2iBGb5P70jv4crCZOSMXY2MCvBWpVjzaM-5p35DDI_sKUbc8SRqRx6ZamK8shmIvXk_pqU6qc26KqTzq50gOnOGLAcjvm_"/>
+<div class="overflow-hidden">
+<p class="text-on-surface font-label-md truncate">Alex Rivera</p>
+<p class="text-on-surface-variant text-[12px] opacity-60">Pro Voyager</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Top Navigation (Context Specific) -->
+<header class="flex justify-end items-center w-full px-page-margin py-stack-sm ml-64 bg-transparent z-40 fixed top-0 right-0 left-0">
+<div class="flex items-center gap-6">
+<div class="flex items-center bg-white/5 border border-white/10 rounded-full px-4 py-2 text-on-surface-variant focus-within:ring-1 focus-within:ring-secondary-container transition-all">
+<span class="material-symbols-outlined text-body-md mr-2">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-48 lg:w-64 placeholder-on-surface-variant/50" placeholder="Search itineraries..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<button class="material-symbols-outlined p-2 hover:text-secondary transition-colors">notifications</button>
+<button class="material-symbols-outlined p-2 hover:text-secondary transition-colors">account_circle</button>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-64 pt-24 pb-stack-lg px-page-margin max-w-7xl mx-auto">
+<!-- Header & Summary Chips -->
+<section class="mb-stack-lg">
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+<div>
+<nav class="flex items-center gap-2 text-on-surface-variant text-label-md mb-4">
+<span class="hover:text-primary cursor-pointer transition-colors">Recent Trips</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-on-surface">Rajasthan Expedition</span>
+</nav>
+<h2 class="font-headline-lg text-headline-lg mb-4">The Royal Jaipur Experience</h2>
+<div class="flex flex-wrap gap-3">
+<span class="px-4 py-1.5 rounded-full glass-card border-white/10 text-on-surface flex items-center gap-2 text-label-md">
+<span class="material-symbols-outlined text-secondary text-[18px]">location_on</span> Jaipur
+                        </span>
+<span class="px-4 py-1.5 rounded-full glass-card border-white/10 text-on-surface flex items-center gap-2 text-label-md">
+<span class="material-symbols-outlined text-secondary text-[18px]">calendar_today</span> 3 Days
+                        </span>
+<span class="px-4 py-1.5 rounded-full glass-card border-white/10 text-on-surface flex items-center gap-2 text-label-md">
+<span class="material-symbols-outlined text-secondary text-[18px]">spa</span> Relaxed
+                        </span>
+<span class="px-4 py-1.5 rounded-full glass-card border-white/10 text-on-surface flex items-center gap-2 text-label-md">
+<span class="material-symbols-outlined text-secondary text-[18px]">restaurant</span> Food
+                        </span>
+</div>
+</div>
+<div class="flex gap-4">
+<button class="px-6 py-2.5 rounded-xl glass-card text-on-surface flex items-center gap-2 hover:bg-white/10 transition-all font-label-md">
+<span class="material-symbols-outlined">share</span> Share Trip
+                    </button>
+<button class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-primary/80 to-secondary/80 text-on-primary-container flex items-center gap-2 hover:brightness-110 shadow-lg transition-all font-label-md">
+<span class="material-symbols-outlined">picture_as_pdf</span> Export PDF
+                    </button>
+</div>
+</div>
+</section>
+<!-- AI Assistant Greeting -->
+<section class="mb-stack-lg">
+<div class="glass-card p-8 rounded-[20px] relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-64 h-64 bg-primary/10 blur-[100px] rounded-full -mr-20 -mt-20"></div>
+<div class="flex items-start gap-6 relative z-10">
+<div class="w-12 h-12 rounded-xl bg-primary-container flex items-center justify-center glow-accent">
+<span class="material-symbols-outlined text-white text-[28px]" data-weight="fill">auto_awesome</span>
+</div>
+<div class="flex-1">
+<h3 class="font-headline-md text-[24px] mb-2">Hello, Alex! Your Jaipur journey is ready.</h3>
+<p class="text-body-lg text-on-surface-variant max-w-3xl leading-relaxed">
+                            I've curated a relaxed, culturally immersive itinerary for your 3-day stay. We're focusing on the "Pink City" heritage today, starting with the iconic Amber Fort. I've also left plenty of time for you to sample local sweets at Laxmi Misthan Bhandar.
+                        </p>
+</div>
+</div>
+</div>
+</section>
+<!-- Itinerary Timeline Section -->
+<section>
+<div class="flex items-center justify-between mb-8">
+<div class="flex items-center gap-4">
+<h4 class="font-headline-md text-headline-md">Day 1</h4>
+<span class="text-on-surface-variant font-body-md opacity-60">October 14, 2024</span>
+</div>
+<div class="flex gap-2">
+<button class="p-2 rounded-lg glass-card hover:text-primary transition-colors material-symbols-outlined">chevron_left</button>
+<button class="p-2 rounded-lg glass-card hover:text-primary transition-colors material-symbols-outlined">chevron_right</button>
+</div>
+</div>
+<div class="space-y-12 relative">
+<!-- Timeline Items -->
+<!-- Activity 1: Amber Fort -->
+<div class="relative pl-16 group">
+<div class="timeline-connector"></div>
+<div class="absolute left-0 top-0 w-10 h-10 rounded-full glass-card border-white/20 flex items-center justify-center z-10 group-hover:border-primary/50 transition-colors">
+<span class="material-symbols-outlined text-primary text-[20px]">castle</span>
+</div>
+<div class="flex flex-col lg:flex-row gap-8 bg-white/2 px-8 py-8 rounded-[24px] border border-white/5 hover:border-white/10 transition-all duration-500">
+<div class="w-full lg:w-1/3 shrink-0 h-48 lg:h-auto rounded-xl overflow-hidden relative">
+<img class="w-full h-full object-cover" data-alt="Majestic wide angle view of the Amber Fort in Jaipur at sunrise, the golden sandstone glowing against a soft hazy blue sky, reflection in the Maota Lake, ultra-high resolution photography, travel magazine style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDjbZsU9MF6h3ZmpFmpS068AT8y1izpBiEpL_9z9ElSPlb38l3SWoku9mZcA2HNTyKbwILJ5In_3_agSAa8dTdn_5mD9CHTbU1s32HEZXrXn9n56U9XvLHFN1jrTh1ugwHcs-MZVeXfwCTOmf2HuJP7VuTxIGaM6VtAuCoKUTd4Yu2KCS_imDcfspbOtM1dmMi2PkPfNJqedL4G09VLAm63vJW8dM-8R8dcW1DokKZ2-Fjc-_D_T7yW"/>
+<div class="absolute top-4 left-4 px-3 py-1 bg-black/40 backdrop-blur-md rounded-lg text-[12px] font-mono-sm uppercase tracking-wider">Morning Activity</div>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h5 class="text-headline-md text-[24px] mb-1">Amber Fort Exploration</h5>
+<p class="text-on-surface-variant text-label-md flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">schedule</span> 09:00 AM — 12:30 PM (3.5 hrs)
+                                    </p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary">more_vert</span>
+</div>
+<p class="text-body-md text-on-surface-variant leading-relaxed mb-6">
+                                Marvel at the blend of Hindu and Mughal architecture. Don't miss the Sheesh Mahal (Mirror Palace) and the stunning view of the Maota Lake. I've scheduled this early to beat the crowd and the heat.
+                            </p>
+<div class="flex flex-wrap gap-4 pt-4 border-t border-white/5">
+<div class="flex items-center gap-2 text-label-md text-secondary">
+<span class="material-symbols-outlined text-[18px]">confirmation_number</span> Pre-booked Tickets
+                                </div>
+<div class="flex items-center gap-2 text-label-md text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">verified</span> Recommended Guide: Rajiv S.
+                                </div>
+</div>
+</div>
+</div>
+</div>
+<!-- Travel Node -->
+<div class="relative pl-16 py-2">
+<div class="timeline-connector !top-0 !bottom-0"></div>
+<div class="flex items-center gap-4 text-label-md text-on-surface-variant italic opacity-60">
+<span class="material-symbols-outlined text-[20px]">directions_car</span>
+<span>25 min drive to City Palace via Amer Rd</span>
+</div>
+</div>
+<!-- Activity 2: City Palace -->
+<div class="relative pl-16 group">
+<div class="timeline-connector"></div>
+<div class="absolute left-0 top-0 w-10 h-10 rounded-full glass-card border-white/20 flex items-center justify-center z-10 group-hover:border-primary/50 transition-colors">
+<span class="material-symbols-outlined text-primary text-[20px]">account_balance</span>
+</div>
+<div class="flex flex-col lg:flex-row gap-8 bg-white/2 px-8 py-8 rounded-[24px] border border-white/5 hover:border-white/10 transition-all duration-500">
+<div class="w-full lg:w-1/3 shrink-0 h-48 lg:h-auto rounded-xl overflow-hidden relative">
+<img class="w-full h-full object-cover" data-alt="Intricate details of the Peacock Gate at the City Palace in Jaipur, vibrant blue and green peacock feather patterns, warm pink sandstone walls, cinematic architectural photography, vivid colors, cultural luxury." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCly4VmiU4vtbRr1XZAx6SLTW0R2q0FsDuTgQuaoxLqK7yyt4Eg_6eLRPUTQjIorcZr8S9s7illycOI8Xeh1IuCbIyFPMNclDfu-YbmIylRZigfQcDeB2IV5W6guXri86IjtmCTK7Cy4QQ_pDHc_obgrS2ljnQf6QwyGUEizQgyBS2AsCADZ9yXIoqBS2gaNKNWMbC9uAtfeyFZbkewWgHFHzhk7bR0_3KDlX_09QAA7j5TtqlC1lQ1"/>
+<div class="absolute top-4 left-4 px-3 py-1 bg-black/40 backdrop-blur-md rounded-lg text-[12px] font-mono-sm uppercase tracking-wider">Afternoon Activity</div>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h5 class="text-headline-md text-[24px] mb-1">City Palace &amp; Museum</h5>
+<p class="text-on-surface-variant text-label-md flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">schedule</span> 01:30 PM — 04:00 PM (2.5 hrs)
+                                    </p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary">more_vert</span>
+</div>
+<p class="text-body-md text-on-surface-variant leading-relaxed mb-6">
+                                A complex of courtyards, gardens, and buildings, the City Palace is still a royal residence. View the world's largest silver urns and the famous peacock-themed Pritam Niwas Chowk gates.
+                            </p>
+<div class="flex flex-wrap gap-4 pt-4 border-t border-white/5">
+<div class="flex items-center gap-2 text-label-md text-secondary">
+<span class="material-symbols-outlined text-[18px]">photo_camera</span> Best Photo Spot: Peacock Gate
+                                </div>
+</div>
+</div>
+</div>
+</div>
+<!-- Travel Node -->
+<div class="relative pl-16 py-2">
+<div class="timeline-connector !top-0 !bottom-0"></div>
+<div class="flex items-center gap-4 text-label-md text-on-surface-variant italic opacity-60">
+<span class="material-symbols-outlined text-[20px]">directions_walk</span>
+<span>10 min walk to Janta Market</span>
+</div>
+</div>
+<!-- Activity 3: Food Walk -->
+<div class="relative pl-16 group">
+<div class="absolute left-0 top-0 w-10 h-10 rounded-full glass-card border-white/20 flex items-center justify-center z-10 group-hover:border-primary/50 transition-colors">
+<span class="material-symbols-outlined text-primary text-[20px]">restaurant</span>
+</div>
+<div class="flex flex-col lg:flex-row gap-8 bg-white/2 px-8 py-8 rounded-[24px] border border-white/5 hover:border-white/10 transition-all duration-500">
+<div class="w-full lg:w-1/3 shrink-0 h-48 lg:h-auto rounded-xl overflow-hidden relative">
+<img class="w-full h-full object-cover" data-alt="Close up of delicious Indian street food sweets from Jaipur, golden fried Ghevar topped with silver leaf and nuts, warm moody atmospheric lighting in a bustling market stall, vibrant textures, high-end food photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBeOkPepMPSNUBbV1c89bx-oe_uwkoH2q8rk3mXT-QzWuUQ7OwSGqvs8kQZBmkKmBuU9XEOyKyaD03wBPXRP8Q7QLx7dADONado1rW1hGgcQVA67AZFDQ7Z_oZXE97cpbUPGNx08d5-j4ZMdm3aF6SRXtagzdR2EZ_JHPY30yDwNsvpLwuKidOrMOhpn8GctPguaY-u700njav07ccG2Rvn--dQDKJmqjgHqqtfh1q6V_RPBttLjJ37"/>
+<div class="absolute top-4 left-4 px-3 py-1 bg-black/40 backdrop-blur-md rounded-lg text-[12px] font-mono-sm uppercase tracking-wider">Evening Experience</div>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h5 class="text-headline-md text-[24px] mb-1">Old City Food &amp; Heritage Walk</h5>
+<p class="text-on-surface-variant text-label-md flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">schedule</span> 05:30 PM — 08:30 PM (3 hrs)
+                                    </p>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary">more_vert</span>
+</div>
+<p class="text-body-md text-on-surface-variant leading-relaxed mb-6">
+                                Experience the soul of Jaipur through its palate. Sample Pyaaz Kachori at Rawat Misthan Bhandar and end the night with traditional Lassi at the famous Lassiwala on MI Road.
+                            </p>
+<div class="flex flex-wrap gap-4 pt-4 border-t border-white/5">
+<div class="flex items-center gap-2 text-label-md text-secondary">
+<span class="material-symbols-outlined text-[18px]">star</span> Must Try: Ghevar
+                                </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Sources & Data Expandable -->
+<section class="mt-section-gap">
+<div class="glass-card rounded-[20px] overflow-hidden">
+<button class="w-full flex items-center justify-between p-6 hover:bg-white/5 transition-all text-on-surface" onclick="document.getElementById('sources-content').classList.toggle('hidden')">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-primary">analytics</span>
+<span class="font-label-md uppercase tracking-widest text-[13px]">Sources &amp; Metadata</span>
+</div>
+<span class="material-symbols-outlined">expand_more</span>
+</button>
+<div class="hidden p-8 pt-0 border-t border-white/5 bg-black/10" id="sources-content">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<div>
+<p class="font-label-md text-on-surface-variant mb-3">Data Engines</p>
+<ul class="space-y-2 text-mono-sm text-on-surface/70">
+<li>Voyage-Core-v4 AI</li>
+<li>Google Places Real-time API</li>
+<li>UNESCO Heritage Database</li>
+</ul>
+</div>
+<div>
+<p class="font-label-md text-on-surface-variant mb-3">Contextual Updates</p>
+<ul class="space-y-2 text-mono-sm text-on-surface/70">
+<li>Weather: Sunny, 32°C (Synced)</li>
+<li>Traffic: Moderate Amer Rd</li>
+<li>Local Events: Diwali Prep (Active)</li>
+</ul>
+</div>
+<div>
+<p class="font-label-md text-on-surface-variant mb-3">Confidence Score</p>
+<div class="flex items-center gap-4">
+<div class="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+<div class="h-full bg-secondary w-[94%] shadow-[0_0_10px_rgba(0,238,252,0.5)]"></div>
+</div>
+<span class="text-mono-sm text-secondary">94%</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Interactive Layer / Tooltip Logic -->
+<script>
+        document.querySelectorAll('.glass-card').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                // Subtle audio-visual interaction would go here
+            });
+        });
+    </script>
+</body></html>

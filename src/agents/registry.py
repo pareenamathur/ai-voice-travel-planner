@@ -41,6 +41,8 @@ class AgentRegistry:
             session_manager,
             planning=self.planning,
             review=self.review,
+            edit=self.edit,
+            knowledge=self.knowledge,
         )
 
         self._specialists: dict[AgentRole, BaseAgent] = {

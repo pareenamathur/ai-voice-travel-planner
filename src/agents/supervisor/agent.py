@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from src.agents.base import BaseAgent
+from src.agents.planning.agent import LIVE_POI_UNAVAILABLE_NOTE
 from src.agents.supervisor.intent import classify_intent, is_greeting
 from src.agents.supervisor.slots import (
     clarification_question,
@@ -20,6 +21,7 @@ from src.platform.session.manager import SessionManager
 from src.shared.messages.types import (
     AgentRole,
     ConversationPhase,
+    EditArtifact,
     PlanArtifact,
     ReviewStatus,
     ReviewVerdict,
@@ -28,6 +30,8 @@ from src.shared.messages.types import (
 )
 
 if TYPE_CHECKING:
+    from src.agents.edit.agent import EditAgent
+    from src.agents.knowledge.agent import KnowledgeAgent
     from src.agents.planning.agent import PlanningAgent
     from src.agents.review.agent import ReviewAgent
 
@@ -52,11 +56,15 @@ class SupervisorAgent(BaseAgent):
         *,
         planning: PlanningAgent | None = None,
         review: ReviewAgent | None = None,
+        edit: EditAgent | None = None,
+        knowledge: KnowledgeAgent | None = None,
     ) -> None:
         super().__init__(llm, gateway, observability)
         self.sessions = session_manager
         self.planning = planning
         self.review = review
+        self.edit = edit
+        self.knowledge = knowledge
 
     async def handle_message(
         self,
@@ -99,6 +107,8 @@ class SupervisorAgent(BaseAgent):
             constraints=constraints,
             phase=session.conversation_phase,
             has_sufficient=sufficient,
+            has_itinerary=session.itinerary is not None,
+            itinerary_approved=session.itinerary_approved,
         )
         self._trace(
             "intent_classification",
@@ -116,6 +126,14 @@ class SupervisorAgent(BaseAgent):
             response_text, task_message, review_verdict, itinerary = await self._handle_plan(
                 sid, corr_id
             )
+        elif intent == TaskType.EDIT:
+            response_text, task_message, review_verdict, itinerary = await self._handle_edit(
+                sid, corr_id, message
+            )
+        elif intent == TaskType.EXPLAIN:
+            response_text, task_message = await self._handle_explain(sid, corr_id, message)
+            review_verdict = None
+            itinerary = self.sessions.read(sid).itinerary
         elif intent == TaskType.CONFIRM:
             response_text = self._handle_confirm(sid, corr_id)
         else:
@@ -307,6 +325,150 @@ class SupervisorAgent(BaseAgent):
         )
         return response, task, verdict, None
 
+    async def _handle_edit(
+        self,
+        session_id: str,
+        corr_id: str,
+        message: str,
+    ) -> tuple[str, TaskMessage, ReviewVerdict | None, dict[str, Any] | None]:
+        if self.edit is None or self.review is None:
+            raise ValueError("Supervisor requires Edit and Review agents to orchestrate EDIT")
+
+        session = self.sessions.read(session_id)
+        if not session.itinerary or not session.itinerary_approved:
+            return (
+                "Please generate and confirm an itinerary before requesting edits.",
+                TaskMessage(
+                    task_type=TaskType.EDIT,
+                    session_id=session_id,
+                    payload={},
+                    correlation_id=corr_id,
+                ),
+                None,
+                None,
+            )
+
+        before_snapshot = dict(session.itinerary)
+        task = TaskMessage(
+            task_type=TaskType.EDIT,
+            session_id=session_id,
+            payload={
+                "edit_intent": message,
+                "message": message,
+                "itinerary": dict(session.itinerary),
+                "before_snapshot": before_snapshot,
+                "city": session.itinerary.get("city") or session.trip_constraints.city,
+            },
+            correlation_id=corr_id,
+        )
+        self._trace(
+            "supervisor_dispatch_edit",
+            corr_id,
+            session_id=session_id,
+            task_type=TaskType.EDIT.value,
+        )
+
+        artifact: EditArtifact = await self.edit.run(task)
+        verdict: ReviewVerdict = await self.review.review_edit(artifact)
+
+        if verdict.status in APPROVED_STATUSES:
+            itinerary = dict(verdict.final_artifact or artifact.itinerary or {})
+            self.sessions.set_itinerary(
+                session_id,
+                itinerary,
+                poi_registry=dict(session.poi_registry),
+                rag_citations=list(session.rag_citations),
+            )
+            self.sessions.set_itinerary_approved(session_id, True)
+            self.sessions.record_eval_report(
+                session_id,
+                verdict.eval_report.model_dump(mode="json"),
+                verdict=verdict.status,
+            )
+            response = _format_edit_response(itinerary, artifact.edit_scope)
+            return response, task, verdict, itinerary
+
+        self.sessions.record_eval_report(
+            session_id,
+            verdict.eval_report.model_dump(mode="json"),
+            verdict=verdict.status,
+        )
+        self.sessions.set_itinerary_approved(session_id, False)
+        response = (
+            f"Review did not approve this edit (status: {verdict.status.value}). "
+            "Your previous itinerary is unchanged."
+        )
+        return response, task, verdict, None
+
+    async def _handle_explain(
+        self,
+        session_id: str,
+        corr_id: str,
+        message: str,
+    ) -> tuple[str, TaskMessage]:
+        if self.knowledge is None:
+            raise ValueError("Supervisor requires Knowledge agent to orchestrate EXPLAIN")
+
+        session = self.sessions.read(session_id)
+        if not session.itinerary:
+            return (
+                "I can explain places after your itinerary is ready. "
+                "Start by planning a trip first.",
+                TaskMessage(
+                    task_type=TaskType.EXPLAIN,
+                    session_id=session_id,
+                    payload={},
+                    correlation_id=corr_id,
+                ),
+            )
+
+        task = TaskMessage(
+            task_type=TaskType.EXPLAIN,
+            session_id=session_id,
+            payload={
+                "question": message,
+                "message": message,
+                "city": session.itinerary.get("city") or session.trip_constraints.city,
+                "itinerary": dict(session.itinerary),
+                "poi_registry": dict(session.poi_registry),
+            },
+            correlation_id=corr_id,
+        )
+        self._trace(
+            "supervisor_dispatch_knowledge",
+            corr_id,
+            session_id=session_id,
+            task_type=TaskType.EXPLAIN.value,
+        )
+
+        result = await self.knowledge.run(task)
+        if result.citations:
+            self.sessions.append_rag_citations(session_id, list(result.citations))
+
+        answer = str(result.payload.get("answer") or "").strip()
+        if not answer:
+            answer = "I couldn't find grounded guidance for that question right now."
+        return answer, task
+
+
+def _format_edit_response(itinerary: dict[str, Any], scope: Any) -> str:
+    day_number = getattr(scope, "day", None) or "?"
+    lines = [
+        f"Your itinerary has been updated for Day {day_number} (approved by Review).",
+        "",
+    ]
+    for day in itinerary.get("days") or []:
+        if day.get("day_number") != day_number:
+            continue
+        activities = day.get("activities") or []
+        if not activities:
+            lines.append(f"Day {day_number}: (no stops scheduled)")
+            break
+        titles = [str(activity.get("title") or "Stop") for activity in activities]
+        lines.append(f"Day {day_number}: {', '.join(titles)}")
+        break
+    return "\n".join(lines)
+
 
 def _format_approved_itinerary_response(itinerary: dict[str, Any], constraints: Any) -> str:
     city = itinerary.get("city") or getattr(constraints, "city", None) or "your destination"
@@ -325,7 +487,13 @@ def _format_approved_itinerary_response(itinerary: dict[str, Any], constraints: 
         titles = [str(activity.get("title") or "Stop") for activity in activities]
         lines.append(f"Day {day_number}: {', '.join(titles)}")
     lines.append("")
-    lines.append("You can ask to adjust a day later once editing is enabled.")
+    lines.append("You can ask to adjust a day or ask why a place was recommended.")
+
+    metadata = itinerary.get("metadata") or {}
+    if metadata.get("live_poi_lookup") is False:
+        note = metadata.get("user_note") or LIVE_POI_UNAVAILABLE_NOTE
+        lines.append("")
+        lines.append(str(note))
     return "\n".join(lines)
 
 

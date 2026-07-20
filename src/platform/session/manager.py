@@ -158,6 +158,27 @@ class SessionManager:
             session.rag_citations = rag_citations
         return self.save(session)
 
+    def append_rag_citations(
+        self,
+        session_id: str,
+        citations: list[dict[str, Any]],
+    ) -> SessionData:
+        """Append unique RAG citations from Knowledge Agent explain flows."""
+        session = self._require(session_id)
+        seen = {
+            str(c.get("citation_id"))
+            for c in session.rag_citations
+            if c.get("citation_id")
+        }
+        for citation in citations:
+            citation_id = citation.get("citation_id")
+            if citation_id and str(citation_id) in seen:
+                continue
+            session.rag_citations.append(citation)
+            if citation_id:
+                seen.add(str(citation_id))
+        return self.save(session)
+
     def set_itinerary_approved(self, session_id: str, approved: bool) -> SessionData:
         session = self._require(session_id)
         session.itinerary_approved = approved

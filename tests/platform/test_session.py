@@ -147,6 +147,28 @@ def test_set_itinerary_and_validate_against_shared_schema():
     assert updated.rag_citations[0]["citation_id"] == "jaipur:wikivoyage#see#0001"
 
 
+def test_append_rag_citations_deduplicates_by_citation_id():
+    mgr = SessionManager()
+    session = mgr.create()
+    mgr.set_itinerary(
+        session.session_id,
+        SAMPLE_ITINERARY,
+        rag_citations=[{"citation_id": "c-1", "section": "See"}],
+    )
+
+    mgr.append_rag_citations(
+        session.session_id,
+        [
+            {"citation_id": "c-1", "section": "See"},
+            {"citation_id": "c-2", "section": "Do"},
+        ],
+    )
+
+    updated = mgr.read(session.session_id)
+    assert len(updated.rag_citations) == 2
+    assert {c["citation_id"] for c in updated.rag_citations} == {"c-1", "c-2"}
+
+
 def test_set_itinerary_approved_and_eval_report():
     mgr = SessionManager()
     session = mgr.create()

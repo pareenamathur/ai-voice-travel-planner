@@ -1,0 +1,187 @@
+.trace-panel {
+  --trace-ink: var(--on-surface, #e5e2e1);
+  --trace-muted: var(--on-surface-variant, #d4c0d7);
+  --trace-border: rgba(255, 255, 255, 0.1);
+  --trace-card: rgba(255, 255, 255, 0.03);
+  --trace-rail: rgba(255, 255, 255, 0.2);
+  --trace-ok: var(--secondary-container, #00eefc);
+  --trace-fail: var(--error, #ffb4ab);
+  --trace-started: var(--tertiary, #ffb961);
+
+  font-family: var(--font, "Geist", system-ui, sans-serif);
+  color: var(--trace-ink);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--trace-border);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-height: 28rem;
+  min-height: 8rem;
+}
+
+.trace-panel__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  flex-shrink: 0;
+}
+
+.trace-panel__title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 650;
+}
+
+.trace-panel__count {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--trace-muted);
+  font-weight: 600;
+}
+
+.trace-panel__empty {
+  margin: 0;
+  padding: 1rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--trace-muted);
+  border: 1px dashed var(--trace-border);
+}
+
+.trace-panel__timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+}
+
+.trace-step {
+  display: grid;
+  grid-template-columns: 1.25rem 1fr;
+  gap: 0.65rem 0.85rem;
+  min-width: 0;
+}
+
+.trace-step__rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 0.35rem;
+}
+
+.trace-step__dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--trace-rail);
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px #fff;
+}
+
+.trace-step--completed .trace-step__dot {
+  background: var(--trace-ok);
+}
+
+.trace-step--failed .trace-step__dot {
+  background: var(--trace-fail);
+}
+
+.trace-step--started .trace-step__dot {
+  background: var(--trace-started);
+}
+
+.trace-step__connector {
+  flex: 1;
+  width: 2px;
+  min-height: 1.25rem;
+  margin-top: 0.25rem;
+  background: var(--trace-rail);
+}
+
+.trace-step__body {
+  background: var(--trace-card);
+  border: 1px solid var(--trace-border);
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.trace-step--last .trace-step__body {
+  margin-bottom: 0;
+}
+
+.trace-step__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 0.75rem;
+}
+
+.trace-step__agent {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.trace-step__badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #e7e5e4;
+  color: var(--trace-muted);
+}
+
+.trace-step__badge--completed {
+  background: #ccfbf1;
+  color: var(--trace-ok);
+}
+
+.trace-step__badge--failed {
+  background: #fee2e2;
+  color: var(--trace-fail);
+}
+
+.trace-step__badge--started {
+  background: #fef3c7;
+  color: var(--trace-started);
+}
+
+.trace-step__action {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--trace-ink);
+}
+
+.trace-step__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--trace-muted);
+}
+
+.trace-step__correlation {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  word-break: break-all;
+}
+
+@media (min-width: 720px) {
+  .trace-panel {
+    max-height: 36rem;
+  }
+}

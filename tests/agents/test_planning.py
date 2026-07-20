@@ -88,7 +88,7 @@ class RecordingGateway(MCPGateway):
         return await super().invoke(role, tool_name, params, correlation_id)
 
     async def _search_pois(self, **kwargs: Any) -> dict[str, Any]:
-        return {"source": "osm", "pois": list(SAMPLE_POIS)}
+        return {"source": "osm", "pois": list(SAMPLE_POIS), "live_poi_lookup": True}
 
     async def _build_itinerary(self, **kwargs: Any) -> dict[str, Any]:
         return {"source": "itinerary_builder", "itinerary": dict(SAMPLE_ITINERARY)}
@@ -143,6 +143,8 @@ async def test_valid_plan_flow_returns_plan_artifact(
     assert artifact.constraints["days"] == 2
     assert "node/1" in artifact.poi_registry
     assert artifact.metadata["tools_used"] == ["search_pois", "build_itinerary"]
+    assert artifact.metadata["live_poi_lookup"] is True
+    assert artifact.itinerary["metadata"]["live_poi_lookup"] is True
     assert artifact.rag_citations == []
 
     # Canonical itinerary validates against shared schema.
@@ -263,3 +265,53 @@ async def test_observability_spans(planning: PlanningAgent, obs: Observability):
     # Gateway also emits tool_call spans for the same correlation id.
     assert "tool_call_start" in events
     assert "tool_call_complete" in events
+
+
+@pytest.mark.asyncio
+async def test_overpass_error_falls_back_without_aborting_plan(obs: Observability):
+    """Overpass failures must not abort planning — use fallback POIs and continue."""
+    from src.agents.planning.agent import LIVE_POI_UNAVAILABLE_NOTE
+    from src.mcp_servers.poi_search.overpass import OverpassError
+
+    class FailingSearchGateway(RecordingGateway):
+        async def _search_pois(self, **kwargs: Any) -> dict[str, Any]:
+            raise OverpassError("Overpass HTTP 429: rate limited")
+
+    gateway = FailingSearchGateway(observability=obs)
+    agent = PlanningAgent(llm=LLMAdapter(), gateway=gateway, observability=obs)
+
+    artifact = await agent.run(_plan_task())
+
+    assert isinstance(artifact, PlanArtifact)
+    assert artifact.itinerary["metadata"]["live_poi_lookup"] is False
+    assert artifact.itinerary["metadata"]["user_note"] == LIVE_POI_UNAVAILABLE_NOTE
+    assert artifact.metadata["live_poi_lookup"] is False
+    assert len(artifact.poi_registry) >= 1
+
+    tool_names = [name for _, name, _ in gateway.calls]
+    assert tool_names == ["search_pois", "build_itinerary"]
+    build_pois = gateway.calls[1][2]["pois"]
+    assert build_pois
+    assert all(p.get("source") in {"llm", "well_known"} for p in build_pois)
+
+    events = [span["event"] for span in obs.get_spans("corr-plan-1")]
+    assert "planning_started" in events
+    assert "poi_lookup_degraded" in events
+    assert "plan_artifact_created" in events
+    assert "planning_failed" not in events
+
+
+@pytest.mark.asyncio
+async def test_empty_poi_search_falls_back_to_llm_well_known(obs: Observability):
+    class EmptySearchGateway(RecordingGateway):
+        async def _search_pois(self, **kwargs: Any) -> dict[str, Any]:
+            return {"source": "osm", "pois": [], "live_poi_lookup": False}
+
+    gateway = EmptySearchGateway(observability=obs)
+    agent = PlanningAgent(llm=LLMAdapter(), gateway=gateway, observability=obs)
+
+    artifact = await agent.run(_plan_task())
+
+    assert artifact.itinerary["metadata"]["live_poi_lookup"] is False
+    assert gateway.calls[1][2]["pois"]
+    assert artifact.metadata["search_source"] in {"llm", "well_known"}

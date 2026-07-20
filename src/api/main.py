@@ -1,11 +1,15 @@
 """HTTP API — routes exclusively to Supervisor Agent."""
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, FastAPI
 from pydantic import BaseModel, Field
 
+from src.agents.planning.errors import PlanningFailedError
 from src.agents.registry import AgentRegistry
 from src.api.config import settings
 from src.api.deps import get_registry
+from src.shared.messages.types import ConversationPhase, TaskType
 
 app = FastAPI(
     title="Voice Travel Planner",
@@ -22,11 +26,21 @@ class SessionMessageRequest(BaseModel):
 
 
 class SessionMessageResponse(BaseModel):
+    """Supervisor response for the Companion UI (Phase 5 Task 7).
+
+    Extra fields mirror what ``SupervisorAgent.handle_message`` already returns;
+    agent logic is unchanged — this only stops FastAPI from stripping them.
+    """
+
     session_id: str
     correlation_id: str
     response: str
     conversation_phase: str
     itinerary_approved: bool
+    intent: str | None = None
+    itinerary: dict[str, Any] | None = None
+    review_verdict: dict[str, Any] | None = None
+    task_message: dict[str, Any] | None = None
 
 
 @router.get("/health")
@@ -40,8 +54,24 @@ async def session_message(
     registry: AgentRegistry = Depends(get_registry),
 ) -> SessionMessageResponse:
     """Sole user entry point — delegates to Supervisor Agent only."""
-    result = await registry.supervisor.handle_message(body.session_id, body.message)
-    return SessionMessageResponse(**result)
+    try:
+        result = await registry.supervisor.handle_message(body.session_id, body.message)
+        return SessionMessageResponse(**result)
+    except PlanningFailedError as exc:
+        # Planning converted Overpass/external failures into a friendly error.
+        # Return HTTP 200 so the companion UI can show the message (not a raw 500).
+        session_id = exc.session_id or body.session_id or ""
+        return SessionMessageResponse(
+            session_id=session_id,
+            correlation_id=exc.correlation_id or "",
+            response=exc.user_message,
+            conversation_phase=ConversationPhase.ACTIVE.value,
+            itinerary_approved=False,
+            intent=TaskType.PLAN.value,
+            itinerary=None,
+            review_verdict=None,
+            task_message=None,
+        )
 
 
 @router.get("/session/{session_id}/trace")

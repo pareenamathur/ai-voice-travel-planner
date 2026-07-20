@@ -1,0 +1,182 @@
+.eval-status-panel {
+  --eval-ink: var(--on-surface, #e5e2e1);
+  --eval-muted: var(--on-surface-variant, #d4c0d7);
+  --eval-border: rgba(255, 255, 255, 0.1);
+  --eval-card: rgba(255, 255, 255, 0.03);
+  --eval-pass: var(--secondary-container, #00eefc);
+  --eval-warning: var(--tertiary, #ffb961);
+  --eval-fail: var(--error, #ffb4ab);
+
+  font-family: var(--font, "Geist", system-ui, sans-serif);
+  color: var(--eval-ink);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--eval-border);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-height: 28rem;
+  min-height: 8rem;
+}
+
+.eval-status-panel__header {
+  flex-shrink: 0;
+}
+
+.eval-status-panel__title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 650;
+}
+
+.eval-status-panel__empty {
+  margin: 0;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--eval-muted);
+  border: 1px dashed var(--eval-border);
+}
+
+.eval-summary {
+  border: 1px solid var(--eval-border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  background: var(--eval-card);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.eval-summary--pass {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+}
+
+.eval-summary--warning {
+  border-color: #fcd34d;
+  background: #fffbeb;
+}
+
+.eval-summary--fail {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.eval-summary--unknown {
+  background: #fafaf9;
+}
+
+.eval-summary__verdict {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.eval-summary__counts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  font-size: 0.875rem;
+  color: var(--eval-muted);
+}
+
+.eval-summary__timestamp {
+  font-size: 0.8rem;
+  color: var(--eval-muted);
+}
+
+.eval-status-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.eval-card {
+  background: var(--eval-card);
+  border: 1px solid var(--eval-border);
+  border-left-width: 4px;
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.eval-card--pass {
+  border-left-color: var(--eval-pass);
+}
+
+.eval-card--warning {
+  border-left-color: var(--eval-warning);
+}
+
+.eval-card--fail {
+  border-left-color: var(--eval-fail);
+}
+
+.eval-card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem 0.75rem;
+}
+
+.eval-card__name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.eval-card__badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #e7e5e4;
+  color: var(--eval-muted);
+}
+
+.eval-card__badge--pass {
+  background: #ccfbf1;
+  color: var(--eval-pass);
+}
+
+.eval-card__badge--warning {
+  background: #fef3c7;
+  color: var(--eval-warning);
+}
+
+.eval-card__badge--fail {
+  background: #fee2e2;
+  color: var(--eval-fail);
+}
+
+.eval-card__score,
+.eval-card__message,
+.eval-card__timestamp {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--eval-muted);
+}
+
+.eval-card__message {
+  color: var(--eval-ink);
+}
+
+@media (min-width: 720px) {
+  .eval-status-panel {
+    max-height: 36rem;
+  }
+}

@@ -5,12 +5,19 @@ from __future__ import annotations
 from typing import Any
 
 from src.agents.base import BaseAgent
+from src.mcp_servers.poi_search.fallback import parse_llm_pois_payload, well_known_pois_for_city
+from src.mcp_servers.poi_search.overpass import OverpassError
 from src.shared.messages.types import (
     AgentRole,
     PlanArtifact,
     TaskMessage,
     TaskType,
     TripConstraints,
+)
+
+LIVE_POI_UNAVAILABLE_NOTE = (
+    "Live place lookup was temporarily unavailable. This itinerary uses general "
+    "destination knowledge instead of live map data."
 )
 
 
@@ -35,10 +42,16 @@ class PlanningAgent(BaseAgent):
             days=constraints.days,
         )
 
-        pois = await self._search_pois(constraints, correlation_id)
+        pois, live_poi_lookup, search_source = await self._resolve_pois(constraints, correlation_id)
         itinerary_payload = await self._build_itinerary(constraints, pois, correlation_id)
 
-        itinerary = itinerary_payload.get("itinerary") or {}
+        itinerary = dict(itinerary_payload.get("itinerary") or {})
+        itinerary_meta = dict(itinerary.get("metadata") or {})
+        itinerary_meta["live_poi_lookup"] = live_poi_lookup
+        if not live_poi_lookup:
+            itinerary_meta["user_note"] = LIVE_POI_UNAVAILABLE_NOTE
+        itinerary["metadata"] = itinerary_meta
+
         poi_registry = self._build_poi_registry(pois, itinerary)
         artifact = PlanArtifact(
             itinerary=itinerary,
@@ -51,7 +64,8 @@ class PlanningAgent(BaseAgent):
                 "source": "planning_agent",
                 "tools_used": ["search_pois", "build_itinerary"],
                 "poi_count": len(pois),
-                "search_source": "osm",
+                "search_source": search_source,
+                "live_poi_lookup": live_poi_lookup,
                 "itinerary_source": itinerary_payload.get("source", "itinerary_builder"),
             },
         )
@@ -62,6 +76,7 @@ class PlanningAgent(BaseAgent):
             session_id=task.session_id,
             day_count=itinerary.get("total_days"),
             poi_registry_size=len(poi_registry),
+            live_poi_lookup=live_poi_lookup,
         )
         return artifact
 
@@ -100,11 +115,49 @@ class PlanningAgent(BaseAgent):
         # Normalize city whitespace for downstream tools.
         return constraints.model_copy(update={"city": city})
 
+    async def _resolve_pois(
+        self,
+        constraints: TripConstraints,
+        correlation_id: str,
+    ) -> tuple[list[dict[str, Any]], bool, str]:
+        """Return (pois, live_poi_lookup, search_source). Never abort on Overpass failure."""
+        try:
+            result = await self._search_pois(constraints, correlation_id)
+        except OverpassError as exc:
+            self._trace(
+                "poi_lookup_degraded",
+                correlation_id,
+                reason="overpass_error",
+                detail=str(exc)[:200],
+                city=constraints.city,
+            )
+            pois = await self._fallback_pois(constraints, correlation_id)
+            source = pois[0].get("source", "well_known") if pois else "well_known"
+            return pois, False, str(source)
+
+        pois = result.get("pois") or []
+        if not isinstance(pois, list):
+            raise ValueError("search_pois.pois must be a list")
+
+        live = bool(result.get("live_poi_lookup", bool(pois)))
+        if live and pois:
+            return pois, True, str(result.get("source") or "osm")
+
+        self._trace(
+            "poi_lookup_degraded",
+            correlation_id,
+            reason="empty_elements",
+            city=constraints.city,
+        )
+        fallback = await self._fallback_pois(constraints, correlation_id)
+        source = fallback[0].get("source", "well_known") if fallback else "well_known"
+        return fallback, False, str(source)
+
     async def _search_pois(
         self,
         constraints: TripConstraints,
         correlation_id: str,
-    ) -> list[dict[str, Any]]:
+    ) -> dict[str, Any]:
         assert self.gateway is not None
         self._trace("search_pois", correlation_id, city=constraints.city)
         result = await self.gateway.invoke(
@@ -118,10 +171,66 @@ class PlanningAgent(BaseAgent):
         )
         if not isinstance(result, dict):
             raise ValueError("search_pois must return a dict payload")
-        pois = result.get("pois") or []
-        if not isinstance(pois, list):
-            raise ValueError("search_pois.pois must be a list")
-        return pois
+        return result
+
+    async def _fallback_pois(
+        self,
+        constraints: TripConstraints,
+        correlation_id: str,
+    ) -> list[dict[str, Any]]:
+        """Use LLM (best-effort) plus well-known attractions when live map data is unavailable."""
+        interests = list(constraints.interests or [])
+        llm_pois: list[dict[str, Any]] = []
+        if self.llm is not None:
+            try:
+                completion = await self.llm.complete(
+                    AgentRole.PLANNING,
+                    [
+                        {
+                            "role": "user",
+                            "content": (
+                                f"List well-known attractions for {constraints.city} as JSON array "
+                                'of objects with keys name, lat, lon, category. Interests: '
+                                f"{', '.join(interests) or 'general sightseeing'}."
+                            ),
+                        }
+                    ],
+                )
+                content = str(completion.get("content") or "")
+                llm_pois = parse_llm_pois_payload(content, city=constraints.city)
+            except Exception as exc:  # noqa: BLE001 — fallback must never abort planning
+                self._trace(
+                    "fallback_llm_pois_failed",
+                    correlation_id,
+                    detail=str(exc)[:200],
+                )
+
+        well_known = well_known_pois_for_city(constraints.city, interests=interests)
+        if llm_pois:
+            # Prefer LLM names when present; fill gaps from curated catalog.
+            merged = list(llm_pois)
+            seen = {p.get("osm_id") for p in merged}
+            seen_names = {str(p.get("name") or "").lower() for p in merged}
+            for poi in well_known:
+                name = str(poi.get("name") or "").lower()
+                if poi.get("osm_id") in seen or name in seen_names:
+                    continue
+                merged.append(poi)
+            self._trace(
+                "fallback_pois_ready",
+                correlation_id,
+                source="llm",
+                poi_count=len(merged),
+            )
+            return merged
+
+        self._trace(
+            "fallback_pois_ready",
+            correlation_id,
+            source="well_known",
+            poi_count=len(well_known),
+        )
+        return well_known
 
     async def _build_itinerary(
         self,

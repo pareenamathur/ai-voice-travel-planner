@@ -1,0 +1,232 @@
+{
+  "name": "golden_3day_relaxed",
+  "description": "Healthy 3-day relaxed Jaipur plan; passes feasibility and grounding.",
+  "artifact_type": "plan",
+  "expected": {
+    "feasibility": "pass",
+    "grounding": "pass"
+  },
+  "artifact": {
+    "correlation_id": "fixture-golden-3day",
+    "rag_citations": [],
+    "poi_registry": {
+      "well_known/jaipur-city-palace": {
+        "osm_id": "well_known/jaipur-city-palace",
+        "name": "City Palace",
+        "lat": 26.9258,
+        "lon": 75.8237,
+        "category": "culture",
+        "source": "well_known"
+      },
+      "well_known/jaipur-hawa-mahal": {
+        "osm_id": "well_known/jaipur-hawa-mahal",
+        "name": "Hawa Mahal",
+        "lat": 26.9239,
+        "lon": 75.8267,
+        "category": "sightseeing",
+        "source": "well_known"
+      },
+      "well_known/jaipur-amber-fort": {
+        "osm_id": "well_known/jaipur-amber-fort",
+        "name": "Amber Fort",
+        "lat": 26.9855,
+        "lon": 75.8513,
+        "category": "sightseeing",
+        "source": "well_known"
+      },
+      "well_known/jaipur-jal-mahal": {
+        "osm_id": "well_known/jaipur-jal-mahal",
+        "name": "Jal Mahal",
+        "lat": 26.9539,
+        "lon": 75.8466,
+        "category": "sightseeing",
+        "source": "well_known"
+      },
+      "well_known/jaipur-jantar-mantar": {
+        "osm_id": "well_known/jaipur-jantar-mantar",
+        "name": "Jantar Mantar",
+        "lat": 26.9247,
+        "lon": 75.8246,
+        "category": "culture",
+        "source": "well_known"
+      },
+      "well_known/jaipur-bapu-bazaar": {
+        "osm_id": "well_known/jaipur-bapu-bazaar",
+        "name": "Bapu Bazaar",
+        "lat": 26.9179,
+        "lon": 75.8235,
+        "category": "shopping",
+        "source": "well_known"
+      }
+    },
+    "itinerary": {
+      "city": "Jaipur",
+      "total_days": 3,
+      "traveler_constraints": {
+        "interests": ["history", "culture"],
+        "pace": "relaxed"
+      },
+      "metadata": {
+        "scheduler": "heuristic_v1",
+        "live_poi_lookup": true
+      },
+      "poi_registry": [
+        {
+          "poi_id": "well_known/jaipur-city-palace",
+          "name": "City Palace",
+          "latitude": 26.9258,
+          "longitude": 75.8237,
+          "category": "culture",
+          "source": "well_known"
+        },
+        {
+          "poi_id": "well_known/jaipur-hawa-mahal",
+          "name": "Hawa Mahal",
+          "latitude": 26.9239,
+          "longitude": 75.8267,
+          "category": "sightseeing",
+          "source": "well_known"
+        },
+        {
+          "poi_id": "well_known/jaipur-amber-fort",
+          "name": "Amber Fort",
+          "latitude": 26.9855,
+          "longitude": 75.8513,
+          "category": "sightseeing",
+          "source": "well_known"
+        },
+        {
+          "poi_id": "well_known/jaipur-jal-mahal",
+          "name": "Jal Mahal",
+          "latitude": 26.9539,
+          "longitude": 75.8466,
+          "category": "sightseeing",
+          "source": "well_known"
+        },
+        {
+          "poi_id": "well_known/jaipur-jantar-mantar",
+          "name": "Jantar Mantar",
+          "latitude": 26.9247,
+          "longitude": 75.8246,
+          "category": "culture",
+          "source": "well_known"
+        },
+        {
+          "poi_id": "well_known/jaipur-bapu-bazaar",
+          "name": "Bapu Bazaar",
+          "latitude": 26.9179,
+          "longitude": 75.8235,
+          "category": "shopping",
+          "source": "well_known"
+        }
+      ],
+      "days": [
+        {
+          "day_number": 1,
+          "activities": [
+            {
+              "id": "d1-a1",
+              "title": "City Palace",
+              "poi_id": "well_known/jaipur-city-palace",
+              "category": "culture",
+              "latitude": 26.9258,
+              "longitude": 75.8237,
+              "start_time": "09:00",
+              "end_time": "10:59",
+              "duration_minutes": 119
+            },
+            {
+              "id": "d1-a2",
+              "title": "Hawa Mahal",
+              "poi_id": "well_known/jaipur-hawa-mahal",
+              "category": "sightseeing",
+              "latitude": 26.9239,
+              "longitude": 75.8267,
+              "start_time": "11:05",
+              "end_time": "13:04",
+              "duration_minutes": 119
+            }
+          ],
+          "travel_segments": [
+            {
+              "from_activity_id": "d1-a1",
+              "to_activity_id": "d1-a2",
+              "travel_minutes": 6,
+              "transport_mode": "walk"
+            }
+          ]
+        },
+        {
+          "day_number": 2,
+          "activities": [
+            {
+              "id": "d2-a1",
+              "title": "Amber Fort",
+              "poi_id": "well_known/jaipur-amber-fort",
+              "category": "sightseeing",
+              "latitude": 26.9855,
+              "longitude": 75.8513,
+              "start_time": "09:00",
+              "end_time": "10:59",
+              "duration_minutes": 119
+            },
+            {
+              "id": "d2-a2",
+              "title": "Jal Mahal",
+              "poi_id": "well_known/jaipur-jal-mahal",
+              "category": "sightseeing",
+              "latitude": 26.9539,
+              "longitude": 75.8466,
+              "start_time": "11:20",
+              "end_time": "13:19",
+              "duration_minutes": 119
+            }
+          ],
+          "travel_segments": [
+            {
+              "from_activity_id": "d2-a1",
+              "to_activity_id": "d2-a2",
+              "travel_minutes": 21,
+              "transport_mode": "drive"
+            }
+          ]
+        },
+        {
+          "day_number": 3,
+          "activities": [
+            {
+              "id": "d3-a1",
+              "title": "Jantar Mantar",
+              "poi_id": "well_known/jaipur-jantar-mantar",
+              "category": "culture",
+              "latitude": 26.9247,
+              "longitude": 75.8246,
+              "start_time": "09:00",
+              "end_time": "10:59",
+              "duration_minutes": 119
+            },
+            {
+              "id": "d3-a2",
+              "title": "Bapu Bazaar",
+              "poi_id": "well_known/jaipur-bapu-bazaar",
+              "category": "shopping",
+              "latitude": 26.9179,
+              "longitude": 75.8235,
+              "start_time": "11:10",
+              "end_time": "13:09",
+              "duration_minutes": 119
+            }
+          ],
+          "travel_segments": [
+            {
+              "from_activity_id": "d3-a1",
+              "to_activity_id": "d3-a2",
+              "travel_minutes": 11,
+              "transport_mode": "walk"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

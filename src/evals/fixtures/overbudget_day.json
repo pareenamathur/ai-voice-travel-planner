@@ -1,0 +1,142 @@
+{
+  "name": "overbudget_day",
+  "description": "Single day schedules 840 minutes against a 600-minute budget; fails feasibility.",
+  "artifact_type": "plan",
+  "expected": {
+    "feasibility": "fail",
+    "grounding": "pass"
+  },
+  "artifact": {
+    "correlation_id": "fixture-overbudget-day",
+    "rag_citations": [],
+    "poi_registry": {
+      "well_known/jaipur-city-palace": {
+        "osm_id": "well_known/jaipur-city-palace",
+        "name": "City Palace",
+        "lat": 26.9258,
+        "lon": 75.8237,
+        "category": "culture",
+        "source": "well_known"
+      },
+      "well_known/jaipur-amber-fort": {
+        "osm_id": "well_known/jaipur-amber-fort",
+        "name": "Amber Fort",
+        "lat": 26.9855,
+        "lon": 75.8513,
+        "category": "sightseeing",
+        "source": "well_known"
+      },
+      "well_known/jaipur-hawa-mahal": {
+        "osm_id": "well_known/jaipur-hawa-mahal",
+        "name": "Hawa Mahal",
+        "lat": 26.9239,
+        "lon": 75.8267,
+        "category": "sightseeing",
+        "source": "well_known"
+      },
+      "well_known/jaipur-jantar-mantar": {
+        "osm_id": "well_known/jaipur-jantar-mantar",
+        "name": "Jantar Mantar",
+        "lat": 26.9247,
+        "lon": 75.8246,
+        "category": "culture",
+        "source": "well_known"
+      }
+    },
+    "itinerary": {
+      "city": "Jaipur",
+      "total_days": 1,
+      "traveler_constraints": {
+        "pace": "moderate"
+      },
+      "metadata": {
+        "live_poi_lookup": true
+      },
+      "poi_registry": [
+        {
+          "poi_id": "well_known/jaipur-city-palace",
+          "name": "City Palace",
+          "latitude": 26.9258,
+          "longitude": 75.8237,
+          "category": "culture",
+          "source": "well_known"
+        },
+        {
+          "poi_id": "well_known/jaipur-amber-fort",
+          "name": "Amber Fort",
+          "latitude": 26.9855,
+          "longitude": 75.8513,
+          "category": "sightseeing",
+          "source": "well_known"
+        },
+        {
+          "poi_id": "well_known/jaipur-hawa-mahal",
+          "name": "Hawa Mahal",
+          "latitude": 26.9239,
+          "longitude": 75.8267,
+          "category": "sightseeing",
+          "source": "well_known"
+        },
+        {
+          "poi_id": "well_known/jaipur-jantar-mantar",
+          "name": "Jantar Mantar",
+          "latitude": 26.9247,
+          "longitude": 75.8246,
+          "category": "culture",
+          "source": "well_known"
+        }
+      ],
+      "days": [
+        {
+          "day_number": 1,
+          "activities": [
+            {
+              "id": "d1-a1",
+              "title": "City Palace",
+              "poi_id": "well_known/jaipur-city-palace",
+              "duration_minutes": 180
+            },
+            {
+              "id": "d1-a2",
+              "title": "Amber Fort",
+              "poi_id": "well_known/jaipur-amber-fort",
+              "duration_minutes": 180
+            },
+            {
+              "id": "d1-a3",
+              "title": "Hawa Mahal",
+              "poi_id": "well_known/jaipur-hawa-mahal",
+              "duration_minutes": 180
+            },
+            {
+              "id": "d1-a4",
+              "title": "Jantar Mantar",
+              "poi_id": "well_known/jaipur-jantar-mantar",
+              "duration_minutes": 180
+            }
+          ],
+          "travel_segments": [
+            {
+              "from_activity_id": "d1-a1",
+              "to_activity_id": "d1-a2",
+              "travel_minutes": 40,
+              "transport_mode": "drive"
+            },
+            {
+              "from_activity_id": "d1-a2",
+              "to_activity_id": "d1-a3",
+              "travel_minutes": 40,
+              "transport_mode": "drive"
+            },
+            {
+              "from_activity_id": "d1-a3",
+              "to_activity_id": "d1-a4",
+              "travel_minutes": 40,
+              "transport_mode": "drive"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

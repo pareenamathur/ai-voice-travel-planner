@@ -1,0 +1,122 @@
+.sources-panel {
+  --src-ink: var(--on-surface, #e5e2e1);
+  --src-muted: var(--on-surface-variant, #d4c0d7);
+  --src-border: rgba(255, 255, 255, 0.1);
+  --src-card: rgba(255, 255, 255, 0.03);
+  --src-accent: var(--secondary-container, #00eefc);
+
+  font-family: var(--font, "Geist", system-ui, sans-serif);
+  color: var(--src-ink);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--src-border);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-height: 28rem;
+  min-height: 8rem;
+}
+
+.sources-panel__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  flex-shrink: 0;
+}
+
+.sources-panel__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.sources-panel__count {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--src-muted);
+  font-weight: 500;
+}
+
+.sources-panel__empty {
+  margin: 0;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--src-muted);
+  border: 1px dashed var(--src-border);
+}
+
+.sources-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 0.25rem;
+}
+
+.citation-card {
+  background: var(--src-card);
+  border: 1px solid var(--src-border);
+  border-radius: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.citation-card__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.citation-card__index {
+  font-weight: 700;
+  color: var(--src-accent);
+  font-size: 0.9rem;
+}
+
+.citation-card__label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.citation-card__id {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--src-muted);
+  word-break: break-all;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+.citation-card__source,
+.citation-card__section {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--src-ink);
+}
+
+.citation-card__source {
+  text-transform: capitalize;
+}
+
+.citation-card__url {
+  font-size: 0.85rem;
+  color: var(--src-accent);
+  word-break: break-all;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.citation-card__url:hover,
+.citation-card__url:focus-visible {
+  color: var(--primary, #ecb2ff);
+}

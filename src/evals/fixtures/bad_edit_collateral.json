@@ -1,0 +1,125 @@
+{
+  "name": "bad_edit_collateral",
+  "description": "Edit scoped to day 2 also mutates day 1; fails edit correctness.",
+  "artifact_type": "edit",
+  "expected": {
+    "feasibility": "pass",
+    "grounding": "pass",
+    "edit_correctness": "fail"
+  },
+  "artifact": {
+    "correlation_id": "fixture-bad-edit-collateral",
+    "edit_scope": {
+      "day": 2,
+      "intent": "make day 2 more relaxing"
+    },
+    "before_snapshot": {
+      "city": "Jaipur",
+      "total_days": 2,
+      "traveler_constraints": {
+        "pace": "moderate"
+      },
+      "metadata": {
+        "live_poi_lookup": true
+      },
+      "poi_registry": [
+        {
+          "poi_id": "well_known/jaipur-city-palace",
+          "name": "City Palace",
+          "latitude": 26.9258,
+          "longitude": 75.8237,
+          "category": "culture",
+          "source": "well_known"
+        },
+        {
+          "poi_id": "well_known/jaipur-amber-fort",
+          "name": "Amber Fort",
+          "latitude": 26.9855,
+          "longitude": 75.8513,
+          "category": "sightseeing",
+          "source": "well_known"
+        }
+      ],
+      "days": [
+        {
+          "day_number": 1,
+          "activities": [
+            {
+              "id": "d1-a1",
+              "title": "City Palace",
+              "poi_id": "well_known/jaipur-city-palace",
+              "duration_minutes": 90
+            }
+          ],
+          "travel_segments": []
+        },
+        {
+          "day_number": 2,
+          "activities": [
+            {
+              "id": "d2-a1",
+              "title": "Amber Fort",
+              "poi_id": "well_known/jaipur-amber-fort",
+              "duration_minutes": 90
+            }
+          ],
+          "travel_segments": []
+        }
+      ]
+    },
+    "itinerary": {
+      "city": "Jaipur",
+      "total_days": 2,
+      "traveler_constraints": {
+        "pace": "moderate"
+      },
+      "metadata": {
+        "live_poi_lookup": true
+      },
+      "poi_registry": [
+        {
+          "poi_id": "well_known/jaipur-city-palace",
+          "name": "City Palace",
+          "latitude": 26.9258,
+          "longitude": 75.8237,
+          "category": "culture",
+          "source": "well_known"
+        },
+        {
+          "poi_id": "well_known/jaipur-amber-fort",
+          "name": "Amber Fort",
+          "latitude": 26.9855,
+          "longitude": 75.8513,
+          "category": "sightseeing",
+          "source": "well_known"
+        }
+      ],
+      "days": [
+        {
+          "day_number": 1,
+          "activities": [
+            {
+              "id": "d1-a1",
+              "title": "City Palace Extended Tour",
+              "poi_id": "well_known/jaipur-city-palace",
+              "duration_minutes": 150
+            }
+          ],
+          "travel_segments": []
+        },
+        {
+          "day_number": 2,
+          "activities": [
+            {
+              "id": "d2-a1",
+              "title": "Amber Fort",
+              "poi_id": "well_known/jaipur-amber-fort",
+              "duration_minutes": 60
+            }
+          ],
+          "travel_segments": []
+        }
+      ]
+    }
+  }
+}

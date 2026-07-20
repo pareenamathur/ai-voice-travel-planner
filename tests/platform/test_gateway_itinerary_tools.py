@@ -45,7 +45,6 @@ def test_itinerary_tools_registered_in_gateway():
     assert "build_itinerary" in tools
     assert "rebuild_day" in tools
     assert registry.gateway.is_permitted(AgentRole.PLANNING, "build_itinerary") is True
-    assert registry.gateway.is_permitted(AgentRole.EDIT, "rebuild_day") is True
     assert "build_itinerary" in registry.gateway.list_tools_for_role(AgentRole.PLANNING)
     assert "rebuild_day" in registry.gateway.list_tools_for_role(AgentRole.EDIT)
 
@@ -186,3 +185,40 @@ async def test_gateway_emits_observability_spans_for_itinerary_tools():
     assert "tool_call_complete" in events
     assert "build_itinerary" in tools
     assert all(span.get("correlation_id") == corr_id for span in spans)
+
+
+def test_retrieve_guidance_registered_in_gateway():
+    registry = get_registry()
+    tools = registry.gateway.list_tools()
+
+    assert "retrieve_guidance" in tools
+    assert registry.gateway.is_permitted(AgentRole.KNOWLEDGE, "retrieve_guidance") is True
+    assert "retrieve_guidance" in registry.gateway.list_tools_for_role(AgentRole.KNOWLEDGE)
+
+
+@pytest.mark.asyncio
+async def test_knowledge_agent_can_invoke_retrieve_guidance():
+    registry = get_registry()
+    result = await registry.gateway.invoke(
+        AgentRole.KNOWLEDGE,
+        "retrieve_guidance",
+        {"query": "Amber Fort opening hours", "city": "Jaipur", "top_k": 3},
+    )
+
+    assert result["source"] == "rag"
+    assert "chunks" in result
+    assert "citations" in result
+
+
+@pytest.mark.asyncio
+async def test_edit_agent_denied_retrieve_guidance():
+    registry = get_registry()
+    with pytest.raises(PermissionDeniedError) as exc_info:
+        await registry.gateway.invoke(
+            AgentRole.EDIT,
+            "retrieve_guidance",
+            {"query": "Amber Fort", "city": "Jaipur"},
+        )
+
+    assert exc_info.value.role == AgentRole.EDIT
+    assert exc_info.value.tool_name == "retrieve_guidance"

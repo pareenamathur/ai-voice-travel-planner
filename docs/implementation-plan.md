@@ -188,13 +188,13 @@ Phases 1, 2, 3.
 
 ### Tasks
 
-- [ ] STT integration
+- [x] STT integration
 - [ ] Microphone + live transcript
-- [ ] Itinerary view (day/block, duration, travel time)
-- [ ] Sources panel
-- [ ] **Agent trace panel** (spans from Observability)
-- [ ] **Eval status panel** (from `last_eval_report` via Session Manager)
-- [ ] UI → Supervisor API only
+- [x] Itinerary view (day/block, duration, travel time)
+- [x] Sources panel
+- [x] **Agent trace panel** (spans from Observability)
+- [x] **Eval status panel** (from `last_eval_report` via Session Manager)
+- [x] UI → Supervisor API only
 
 ### Deliverables
 
@@ -214,25 +214,25 @@ Phase 4.
 
 #### Edit Agent
 
-- [ ] Parse `edit_intent`; resolve scope
-- [ ] Call `rebuild_day` via Gateway
-- [ ] Submit `EditArtifact` to **Review Agent** — not to Supervisor
+- [x] Parse `edit_intent`; resolve scope
+- [x] Call `rebuild_day` via Gateway
+- [x] Submit `EditArtifact` to **Review Agent** — not to Supervisor
 - [ ] Optional `estimate_travel_time` via Gateway
 
 #### Knowledge Agent
 
-- [ ] Handle `EXPLAIN` via Gateway (`retrieve_guidance`, `search_pois`, optional `get_weather`)
-- [ ] Return `AgentResult` to **Supervisor** — Review bypassed
+- [x] Handle `EXPLAIN` via Gateway (`retrieve_guidance`, `search_pois`, optional `get_weather`)
+- [x] Return `AgentResult` to **Supervisor** — Review bypassed
 
 #### Supervisor updates
 
-- [ ] Route `EDIT`: delegate Edit → wait ReviewVerdict → update Session Manager → user
-- [ ] Route `EXPLAIN`: delegate Knowledge → user (no Review)
-- [ ] Verify Planning/Edit never appear in trace as direct responders to user
+- [x] Route `EDIT`: delegate Edit → wait ReviewVerdict → update Session Manager → user
+- [x] Route `EXPLAIN`: delegate Knowledge → user (no Review)
+- [x] Verify Planning/Edit never appear in trace as direct responders to user
 
 #### Review stub
 
-- [ ] Accept `EditArtifact`; passthrough `ReviewVerdict(PASS)`
+- [x] Accept `EditArtifact`; passthrough `ReviewVerdict(PASS)`
 
 ### Deliverables
 
@@ -254,9 +254,9 @@ Phases 4, 5.
 
 #### Eval modules (`src/evals/`)
 
-- [ ] Feasibility, Grounding, Edit Correctness
-- [ ] CLI: `npm run eval` / `python -m evals.run --suite all`
-- [ ] ≥5 golden fixtures
+- [x] Feasibility, Grounding, Edit Correctness
+- [x] CLI: `python -m src.evals.run --suite all`
+- [x] ≥5 golden fixtures
 
 #### Review Agent (full)
 

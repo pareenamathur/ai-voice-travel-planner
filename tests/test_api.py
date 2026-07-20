@@ -48,3 +48,33 @@ def test_no_specialist_http_endpoints():
     ]:
         response = client.post(path, json={})
         assert response.status_code == 404
+
+
+def test_planning_failed_error_returns_friendly_200_not_500(monkeypatch):
+    """Overpass/planning failures must surface as HTTP 200 with a clear message."""
+    from src.agents.planning.errors import PlanningFailedError
+    from src.api.deps import get_registry
+
+    registry = get_registry()
+
+    async def boom(session_id, message, correlation_id=None):  # type: ignore[no-untyped-def]
+        raise PlanningFailedError(
+            "I couldn't look up places for your trip right now because the map service "
+            "is temporarily unavailable. Please try again in a moment.",
+            session_id=session_id or "sess-fail",
+            correlation_id="corr-fail",
+        )
+
+    monkeypatch.setattr(registry.supervisor, "handle_message", boom)
+
+    response = client.post(
+        "/api/session/message",
+        json={"session_id": "sess-fail", "message": "yes"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["session_id"] == "sess-fail"
+    assert data["itinerary_approved"] is False
+    assert data["intent"] == "plan"
+    assert "unavailable" in data["response"].lower()
+    assert data["task_message"] is None
