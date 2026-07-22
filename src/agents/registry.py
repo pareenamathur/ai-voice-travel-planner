@@ -34,6 +34,8 @@ class AgentRegistry:
         self.edit = EditAgent(llm, gateway, observability)
         self.export = ExportAgent(llm, gateway, observability)
         self.review = ReviewAgent(llm, gateway, observability)
+        # Review issues at most one RegenRequest back to Planning or Edit.
+        self.review.set_originators(planning=self.planning, edit=self.edit)
         self.supervisor = SupervisorAgent(
             llm,
             gateway,
@@ -43,6 +45,7 @@ class AgentRegistry:
             review=self.review,
             edit=self.edit,
             knowledge=self.knowledge,
+            export=self.export,
         )
 
         self._specialists: dict[AgentRole, BaseAgent] = {

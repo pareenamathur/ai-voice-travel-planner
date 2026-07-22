@@ -177,6 +177,24 @@ class SessionManager:
             session.rag_citations.append(citation)
             if citation_id:
                 seen.add(str(citation_id))
+
+        # Keep itinerary Sources panel in sync when guidance is retrieved later.
+        if session.itinerary is not None and citations:
+            itinerary = dict(session.itinerary)
+            existing = list(itinerary.get("citations") or [])
+            existing_ids = {
+                str(c.get("citation_id")) for c in existing if c.get("citation_id")
+            }
+            for citation in citations:
+                citation_id = citation.get("citation_id")
+                if citation_id and str(citation_id) in existing_ids:
+                    continue
+                existing.append(citation)
+                if citation_id:
+                    existing_ids.add(str(citation_id))
+            itinerary["citations"] = existing
+            session.itinerary = itinerary
+
         return self.save(session)
 
     def set_itinerary_approved(self, session_id: str, approved: bool) -> SessionData:

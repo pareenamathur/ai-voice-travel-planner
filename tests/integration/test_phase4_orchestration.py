@@ -183,7 +183,8 @@ async def test_full_supervisor_planning_review_flow(
     assert result["review_verdict"]["status"] == ReviewStatus.PASS.value
     assert result["task_message"]["task_type"] == TaskType.PLAN.value
     assert "approved by Review" in result["response"]
-    assert "City Palace" in result["response"]
+    assert result["itinerary"] is not None
+    assert "City Palace" in str(result["itinerary"])
 
     itinerary = Itinerary.model_validate(result["itinerary"])
     assert itinerary.city == "Jaipur"
@@ -203,7 +204,10 @@ async def test_session_updated_and_itinerary_approved(
     assert session.itinerary is not None
     assert session.itinerary["city"] == "Jaipur"
     assert session.last_review_verdict == ReviewStatus.PASS.value
-    assert session.last_eval_report == {"entries": []}
+    assert session.last_eval_report is not None
+    entry_names = {e["name"] for e in session.last_eval_report["entries"]}
+    assert entry_names == {"feasibility", "grounding"}
+    assert all(e["passed"] for e in session.last_eval_report["entries"])
     assert "node/1" in session.poi_registry
     assert session.conversation_phase.value == "active"
 
@@ -246,19 +250,39 @@ async def test_review_pass_path(registry: AgentRegistry):
 
 
 @pytest.mark.asyncio
-async def test_review_fail_placeholder_path(
+async def test_review_fail_after_regen_returns_best_available(
     sessions: SessionManager,
     gateway: RecordingGateway,
     obs: Observability,
 ):
     planning = PlanningAgent(llm=LLMAdapter(), gateway=gateway, observability=obs)
+    best_draft = {
+        "city": "Jaipur",
+        "total_days": 2,
+        "days": [
+            {
+                "day_number": 1,
+                "activities": [{"title": "City Palace"}],
+                "travel_segments": [],
+            }
+        ],
+    }
     review = ReviewAgent(llm=LLMAdapter(), gateway=None, observability=obs)
     review.run = AsyncMock(  # type: ignore[method-assign]
         return_value=ReviewVerdict(
             status=ReviewStatus.FAIL,
-            eval_report=EvalReport(entries=[]),
-            final_artifact=None,
-            regen_attempted=False,
+            eval_report=EvalReport(
+                entries=[
+                    {
+                        "name": "feasibility",
+                        "passed": False,
+                        "reasons": ["day 1: scheduled 840 min exceeds the 600 min daily window"],
+                    },
+                    {"name": "grounding", "passed": True, "reasons": []},
+                ]
+            ),
+            final_artifact=best_draft,
+            regen_attempted=True,
             correlation_id="corr-fail",
         )
     )
@@ -276,18 +300,25 @@ async def test_review_fail_placeholder_path(
 
     assert result["intent"] == TaskType.PLAN.value
     assert result["itinerary_approved"] is False
-    assert result["itinerary"] is None
-    assert "regeneration will be implemented" in result["response"].lower()
+    assert result["itinerary"] == best_draft
+    assert "quality checks did not fully pass" in result["response"].lower()
+    assert "one regeneration was already attempted" in result["response"].lower()
+    assert "feasibility" in result["response"].lower()
     assert result["review_verdict"]["status"] == ReviewStatus.FAIL.value
+    assert result["review_verdict"]["regen_attempted"] is True
     assert session.itinerary_approved is False
-    assert session.itinerary is None
+    assert session.itinerary == best_draft
     assert session.last_review_verdict == ReviewStatus.FAIL.value
+    assert session.last_eval_report is not None
+    assert session.last_eval_report["entries"][0]["name"] == "feasibility"
+    assert session.last_eval_report["entries"][0]["passed"] is False
 
     events = [span["event"] for span in obs.get_spans("corr-fail")]
     assert "supervisor_dispatch_planning" in events
     assert "planning_completed" in events
     assert "review_completed" in events
     assert "itinerary_saved" not in events
+    assert "itinerary_saved_unapproved" in events
 
 
 @pytest.mark.asyncio

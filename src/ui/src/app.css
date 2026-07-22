@@ -62,6 +62,23 @@ body {
   overflow-x: hidden;
 }
 
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0.75rem;
+  z-index: 100;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+  text-decoration: none;
+  font-size: 0.875rem;
+}
+
+.skip-link:focus {
+  left: 0.75rem;
+}
+
 .material-symbols-outlined {
   font-variation-settings: "FILL" 0, "wght" 300, "GRAD" 0, "opsz" 24;
   vertical-align: middle;
@@ -117,6 +134,11 @@ body {
   z-index: 1;
   min-height: 100vh;
   display: flex;
+}
+
+.app-shell--chat {
+  max-height: 100vh;
+  overflow: hidden;
 }
 
 .app-shell__workspace {
@@ -581,6 +603,17 @@ body {
   color: var(--on-surface-variant);
   line-height: 1.6;
   white-space: pre-wrap;
+}
+
+.itinerary-approval-banner {
+  margin: 1rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--error, #ffb4ab) 40%, transparent);
+  background: color-mix(in srgb, var(--error, #ffb4ab) 10%, transparent);
+  color: var(--on-surface, #e5e2e1);
+  font-size: 0.95rem;
+  line-height: 1.45;
 }
 
 .glass-card {

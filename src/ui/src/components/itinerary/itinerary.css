@@ -49,6 +49,36 @@
   gap: 2.5rem;
 }
 
+.itinerary-view__fallback-note {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 185, 97, 0.08);
+  border: 1px solid rgba(255, 185, 97, 0.2);
+  color: var(--tertiary, #ffb961);
+  font-size: 0.9rem;
+}
+
+.itinerary-view__sources {
+  margin-top: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.itinerary-view__sources-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.itinerary-view__sources-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--on-surface-variant, #d4c0d7);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
 .day-card {
   display: flex;
   flex-direction: column;
@@ -209,6 +239,12 @@
   font-size: 0.875rem;
   font-style: italic;
   opacity: 0.75;
+}
+
+.travel-segment__arrow {
+  font-style: normal;
+  opacity: 0.55;
+  color: var(--on-surface-variant, #d4c0d7);
 }
 
 .travel-segment__time {

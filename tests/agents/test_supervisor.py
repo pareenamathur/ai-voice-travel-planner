@@ -476,3 +476,189 @@ def test_classify_intent_edit_requires_approval():
         itinerary_approved=False,
     )
     assert intent == TaskType.CONFIRM
+
+
+@pytest.mark.asyncio
+async def test_review_pass_persists_eval_report_and_approval(
+    sessions: SessionManager,
+    obs: Observability,
+):
+    """Phase 7 Task 3 — PASS path keeps approved itinerary + eval report."""
+    itinerary = {
+        "city": "Jaipur",
+        "total_days": 2,
+        "days": [{"day_number": 1, "activities": [{"title": "City Palace"}]}],
+    }
+    report = EvalReport(
+        entries=[
+            {"name": "feasibility", "passed": True, "reasons": []},
+            {"name": "grounding", "passed": True, "reasons": []},
+        ]
+    )
+    planning = AsyncMock(spec=PlanningAgent)
+    planning.run = AsyncMock(
+        return_value=PlanArtifact(
+            itinerary=itinerary,
+            poi_registry={"node/1": {"name": "City Palace"}},
+            correlation_id="corr-pass",
+        )
+    )
+    review = AsyncMock(spec=ReviewAgent)
+    review.run = AsyncMock(
+        return_value=ReviewVerdict(
+            status=ReviewStatus.PASS,
+            eval_report=report,
+            final_artifact=itinerary,
+            regen_attempted=False,
+            correlation_id="corr-pass",
+        )
+    )
+    supervisor = SupervisorAgent(
+        llm=LLMAdapter(),
+        gateway=None,
+        observability=obs,
+        session_manager=sessions,
+        planning=planning,
+        review=review,
+    )
+
+    confirm = await supervisor.handle_message(None, "Plan a 2-day trip to Jaipur")
+    result = await supervisor.handle_message(confirm["session_id"], "yes")
+    session = sessions.read(result["session_id"])
+
+    assert result["itinerary_approved"] is True
+    assert result["itinerary"] == itinerary
+    assert "approved by Review" in result["response"]
+    assert result["review_verdict"]["status"] == ReviewStatus.PASS.value
+    assert session.itinerary_approved is True
+    assert session.itinerary == itinerary
+    assert session.last_review_verdict == ReviewStatus.PASS.value
+    assert session.last_eval_report == report.model_dump(mode="json")
+    planning.run.assert_awaited_once()
+    review.run.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_review_pass_after_regeneration_returns_regenerated_itinerary(
+    sessions: SessionManager,
+    obs: Observability,
+):
+    """Phase 7 Task 3 — PASS after Review regen uses final_artifact."""
+    original = {
+        "city": "Jaipur",
+        "total_days": 1,
+        "days": [{"day_number": 1, "activities": [{"title": "Overloaded Day"}]}],
+    }
+    regenerated = {
+        "city": "Jaipur",
+        "total_days": 2,
+        "days": [
+            {"day_number": 1, "activities": [{"title": "City Palace"}]},
+            {"day_number": 2, "activities": [{"title": "Hawa Mahal"}]},
+        ],
+    }
+    report = EvalReport(
+        entries=[
+            {"name": "feasibility", "passed": True, "reasons": []},
+            {"name": "grounding", "passed": True, "reasons": []},
+        ]
+    )
+    planning = AsyncMock(spec=PlanningAgent)
+    planning.run = AsyncMock(
+        return_value=PlanArtifact(itinerary=original, correlation_id="corr-regen-pass")
+    )
+    planning.handle_regen = AsyncMock()
+    review = AsyncMock(spec=ReviewAgent)
+    review.run = AsyncMock(
+        return_value=ReviewVerdict(
+            status=ReviewStatus.PASS,
+            eval_report=report,
+            final_artifact=regenerated,
+            regen_attempted=True,
+            correlation_id="corr-regen-pass",
+        )
+    )
+    supervisor = SupervisorAgent(
+        llm=LLMAdapter(),
+        gateway=None,
+        observability=obs,
+        session_manager=sessions,
+        planning=planning,
+        review=review,
+    )
+
+    confirm = await supervisor.handle_message(None, "Plan a 2-day trip to Jaipur")
+    result = await supervisor.handle_message(confirm["session_id"], "yes")
+    session = sessions.read(result["session_id"])
+
+    assert result["itinerary_approved"] is True
+    assert result["itinerary"] == regenerated
+    assert "trip panel" in result["response"].lower() or "ready" in result["response"].lower()
+    assert result["review_verdict"]["regen_attempted"] is True
+    assert session.itinerary == regenerated
+    assert session.itinerary_approved is True
+    assert session.last_eval_report == report.model_dump(mode="json")
+    # Supervisor must not request a second regeneration itself.
+    planning.handle_regen.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_review_fail_after_regeneration_returns_best_and_explains(
+    sessions: SessionManager,
+    obs: Observability,
+):
+    """Phase 7 Task 3 — FAIL after regen returns best draft, not approved."""
+    best = {
+        "city": "Jaipur",
+        "total_days": 1,
+        "days": [{"day_number": 1, "activities": [{"title": "City Palace"}]}],
+    }
+    report = EvalReport(
+        entries=[
+            {
+                "name": "feasibility",
+                "passed": False,
+                "reasons": ["day 1 over budget"],
+            },
+            {"name": "grounding", "passed": True, "reasons": []},
+        ]
+    )
+    planning = AsyncMock(spec=PlanningAgent)
+    planning.run = AsyncMock(
+        return_value=PlanArtifact(itinerary=best, correlation_id="corr-regen-fail")
+    )
+    planning.handle_regen = AsyncMock()
+    review = AsyncMock(spec=ReviewAgent)
+    review.run = AsyncMock(
+        return_value=ReviewVerdict(
+            status=ReviewStatus.FAIL,
+            eval_report=report,
+            final_artifact=best,
+            regen_attempted=True,
+            correlation_id="corr-regen-fail",
+        )
+    )
+    supervisor = SupervisorAgent(
+        llm=LLMAdapter(),
+        gateway=None,
+        observability=obs,
+        session_manager=sessions,
+        planning=planning,
+        review=review,
+    )
+
+    confirm = await supervisor.handle_message(None, "Plan a 2-day trip to Jaipur")
+    result = await supervisor.handle_message(confirm["session_id"], "yes")
+    session = sessions.read(result["session_id"])
+
+    assert result["itinerary_approved"] is False
+    assert result["itinerary"] == best
+    assert "quality checks did not fully pass" in result["response"].lower()
+    assert "one regeneration was already attempted" in result["response"].lower()
+    assert "feasibility" in result["response"].lower()
+    assert "day 1 over budget" in result["response"].lower()
+    assert session.itinerary_approved is False
+    assert session.itinerary == best
+    assert session.last_review_verdict == ReviewStatus.FAIL.value
+    assert session.last_eval_report == report.model_dump(mode="json")
+    planning.handle_regen.assert_not_awaited()

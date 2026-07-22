@@ -10,6 +10,9 @@ export type { ActivityCardProps } from "./ActivityCard";
 export { TravelSegmentView } from "./TravelSegmentView";
 export type { TravelSegmentViewProps } from "./TravelSegmentView";
 
+export { TripPanelBusy } from "./TripPanelBusy";
+export type { TripPanelBusyProps } from "./TripPanelBusy";
+
 export {
   sortActivitiesChronologically,
   findTravelSegment,

@@ -8,6 +8,7 @@ from src.platform.llm.adapter import LLMAdapter
 from src.platform.mcp_gateway.gateway import MCPGateway
 from src.platform.observability.tracer import Observability
 from src.platform.session.manager import SessionManager
+from src.mcp_servers.export import trigger_export
 from src.rag.guidance import retrieve_guidance
 
 _registry: AgentRegistry | None = None
@@ -31,6 +32,7 @@ def get_registry() -> AgentRegistry:
         gateway.register("build_itinerary", itinerary_service.build_itinerary)
         gateway.register("rebuild_day", itinerary_service.rebuild_day)
         gateway.register("retrieve_guidance", retrieve_guidance)
+        gateway.register("trigger_export", trigger_export)
 
         llm = LLMAdapter()
         _registry = AgentRegistry(session_manager, llm, gateway, observability)

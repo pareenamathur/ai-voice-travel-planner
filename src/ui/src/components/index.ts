@@ -46,3 +46,16 @@ export type {
 
 export { SideNav, TopBar } from "./layout";
 export type { SideNavProps, AppNavId, TopBarProps } from "./layout";
+
+export {
+  ChatThread,
+  ChatComposer,
+  ItineraryChatCard,
+  DeveloperPanels,
+} from "./chat";
+export type {
+  ChatThreadProps,
+  ChatComposerProps,
+  ItineraryChatCardProps,
+  DeveloperPanelsProps,
+} from "./chat";

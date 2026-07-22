@@ -143,13 +143,32 @@ def _find_day_index(days: list[DayPlan], day_number: int) -> int | None:
 def _pois_from_day(day: DayPlan, registry_by_id: dict[str, PoiReference]) -> list[POI]:
     pois: list[POI] = []
     for activity in day.activities:
+        category = str(activity.category or "").lower()
+        if category in {"rest", "food"} and not activity.poi_id:
+            continue
         if activity.poi_id and activity.poi_id in registry_by_id:
             pois.append(reference_to_poi(registry_by_id[activity.poi_id]))
             continue
-        if activity.latitude is not None and activity.longitude is not None:
+        if activity.poi_id and activity.latitude is not None and activity.longitude is not None:
             pois.append(
                 POI(
-                    osm_id=activity.poi_id or activity.id,
+                    osm_id=activity.poi_id,
+                    name=activity.title,
+                    lat=activity.latitude,
+                    lon=activity.longitude,
+                    category=str(activity.category) if activity.category is not None else None,
+                )
+            )
+            continue
+        if (
+            activity.poi_id is None
+            and activity.latitude is not None
+            and activity.longitude is not None
+            and category not in {"rest", "food"}
+        ):
+            pois.append(
+                POI(
+                    osm_id=activity.id,
                     name=activity.title,
                     lat=activity.latitude,
                     lon=activity.longitude,

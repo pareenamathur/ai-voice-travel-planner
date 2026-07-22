@@ -36,13 +36,19 @@ export function evalReportFromVerdict(
       ? ((rawReport as { entries: EvalReportData["entries"] }).entries ?? [])
       : [];
 
-  if (!status && entries.length === 0) {
+  const regenAttempted =
+    typeof reviewVerdict.regen_attempted === "boolean"
+      ? reviewVerdict.regen_attempted
+      : null;
+
+  if (!status && entries.length === 0 && regenAttempted === null) {
     return null;
   }
 
   return {
     overall_verdict: status,
     entries,
+    regen_attempted: regenAttempted,
   };
 }
 

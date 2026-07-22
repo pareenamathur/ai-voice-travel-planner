@@ -56,7 +56,7 @@ def test_poi_schema_normalization_way_center():
 @pytest.mark.asyncio
 async def test_overpass_client_caches(tmp_path: Path):
     query = "[out:json];node(0,0,1,1);out;"
-    payload = {"elements": []}
+    payload = {"elements": [{"type": "node", "id": 1, "lat": 26.9, "lon": 75.8}]}
 
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
@@ -69,7 +69,7 @@ async def test_overpass_client_caches(tmp_path: Path):
         assert first == payload
 
         # Second call should hit cache; change transport payload to prove it isn't used.
-        payload2 = {"elements": [{"type": "node", "id": 1}]}
+        payload2 = {"elements": [{"type": "node", "id": 99}]}
         transport2 = httpx.MockTransport(lambda req: httpx.Response(200, json=payload2))
         async with httpx.AsyncClient(transport=transport2) as client2:
             oc2 = OverpassClient(
@@ -87,6 +87,81 @@ async def test_overpass_client_caches(tmp_path: Path):
 
 
 @pytest.mark.asyncio
+async def test_overpass_does_not_cache_empty_elements(tmp_path: Path):
+    query = "[out:json];node(0,0,1,1);out;"
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return httpx.Response(200, json={"elements": []})
+        return httpx.Response(
+            200,
+            json={
+                "elements": [
+                    {
+                        "type": "node",
+                        "id": 7,
+                        "lat": 26.9,
+                        "lon": 75.8,
+                        "tags": {"name": "Live POI"},
+                    }
+                ]
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        oc = OverpassClient(
+            base_urls=[
+                "https://overpass-a.test/api",
+                "https://overpass-b.test/api",
+            ],
+            cache_dir=tmp_path,
+            client=client,
+            max_attempts_per_mirror=1,
+        )
+        payload = await oc.run_query(query, use_cache=True)
+
+    assert calls["n"] == 2
+    assert payload["elements"]
+    # Empty response must never poison the on-disk cache.
+    for path in tmp_path.glob("overpass-*.json"):
+        cached = json.loads(path.read_text(encoding="utf-8"))
+        assert cached.get("elements")
+
+
+@pytest.mark.asyncio
+async def test_overpass_ignores_poisoned_empty_cache(tmp_path: Path):
+    query = "[out:json];node(0,0,1,1);out;"
+    oc = OverpassClient(base_url="https://overpass.test/api", cache_dir=tmp_path)
+    cache_path = oc._cache_path(query)
+    cache_path.write_text(json.dumps({"elements": []}), encoding="utf-8")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "elements": [
+                    {"type": "node", "id": 3, "lat": 26.9, "lon": 75.8, "tags": {"name": "A"}}
+                ]
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        oc2 = OverpassClient(
+            base_url="https://overpass.test/api",
+            cache_dir=tmp_path,
+            client=client,
+        )
+        payload = await oc2.run_query(query, use_cache=True)
+
+    assert len(payload["elements"]) == 1
+    assert json.loads(cache_path.read_text(encoding="utf-8"))["elements"]
+
+
+@pytest.mark.asyncio
 async def test_overpass_sends_descriptive_user_agent_and_referer(tmp_path: Path):
     query = "[out:json];node(0,0,1,1);out;"
     seen: list[httpx.Request] = []
@@ -99,7 +174,14 @@ async def test_overpass_sends_descriptive_user_agent_and_referer(tmp_path: Path)
             "application/x-www-form-urlencoded"
         )
         assert b"data=" in request.content
-        return httpx.Response(200, json={"elements": []})
+        return httpx.Response(
+            200,
+            json={
+                "elements": [
+                    {"type": "node", "id": 1, "lat": 26.9, "lon": 75.8, "tags": {"name": "A"}}
+                ]
+            },
+        )
 
     transport = httpx.MockTransport(handler)
     async with httpx.AsyncClient(transport=transport) as client:
@@ -253,12 +335,16 @@ async def test_poi_search_caches_successful_city_lookup_for_24h(tmp_path: Path):
         oc = OverpassClient(base_url="https://overpass.test/api", cache_dir=tmp_path, client=client)
         service = POISearchService(overpass=oc, city_cache_ttl_seconds=24 * 3600)
         first = await service.search_pois(city="Jaipur", interests=["food"], use_cache=True)
-        second = await service.search_pois(city="Jaipur", interests=["culture"], use_cache=True)
+        # Same interests → city+interest cache hit (no second Overpass call).
+        cached_same = await service.search_pois(city="Jaipur", interests=["food"], use_cache=True)
+        # Different interests must not reuse the food cache.
+        culture = await service.search_pois(city="Jaipur", interests=["culture"], use_cache=True)
 
-    assert hits["n"] == 1
+    assert hits["n"] == 2
     assert first["live_poi_lookup"] is True
-    assert second["pois"] == first["pois"]
-    assert second["source"] == "city_cache"
+    assert cached_same["pois"] == first["pois"]
+    assert cached_same["source"] == "city_cache"
+    assert culture["source"] == "osm"
 
 
 @pytest.mark.asyncio

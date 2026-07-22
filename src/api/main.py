@@ -1,14 +1,17 @@
 """HTTP API — routes exclusively to Supervisor Agent."""
 
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, FastAPI
+from fastapi import APIRouter, Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from src.agents.planning.errors import PlanningFailedError
 from src.agents.registry import AgentRegistry
 from src.api.config import settings
 from src.api.deps import get_registry
+from src.api.internal_export import router as internal_export_router
 from src.shared.messages.types import ConversationPhase, TaskType
 
 app = FastAPI(
@@ -17,12 +20,25 @@ app = FastAPI(
     version="0.1.0",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 router = APIRouter(prefix="/api")
 
 
 class SessionMessageRequest(BaseModel):
     session_id: str | None = None
     message: str = Field(..., min_length=1)
+
+
+class SessionExportRequest(BaseModel):
+    session_id: str = Field(..., min_length=1)
+    format: Literal["pdf", "markdown", "json"] = "pdf"
 
 
 class SessionMessageResponse(BaseModel):
@@ -45,7 +61,7 @@ class SessionMessageResponse(BaseModel):
 
 @router.get("/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok", "phase": "0-foundation"}
+    return {"status": "ok", "service": "voice-travel-planner"}
 
 
 @router.post("/session/message", response_model=SessionMessageResponse)
@@ -74,6 +90,23 @@ async def session_message(
         )
 
 
+@router.post("/session/export")
+async def session_export(
+    body: SessionExportRequest,
+    registry: AgentRegistry = Depends(get_registry),
+) -> Response:
+    """Download an approved itinerary (Supervisor → Export Agent)."""
+    outcome = await registry.supervisor.handle_export(body.session_id, body.format)
+    if outcome.get("error"):
+        raise HTTPException(status_code=400, detail=str(outcome["error"]))
+    filename = str(outcome.get("filename") or "itinerary-export")
+    return Response(
+        content=outcome["content"],
+        media_type=str(outcome.get("media_type") or "application/octet-stream"),
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/session/{session_id}/trace")
 async def session_trace(
     session_id: str,
@@ -86,11 +119,12 @@ async def session_trace(
 
 
 app.include_router(router)
+app.include_router(internal_export_router, prefix="/api")
 
 
 @app.get("/health")
 async def root_health() -> dict[str, str]:
-    return {"status": "ok", "phase": "0-foundation"}
+    return {"status": "ok", "service": "voice-travel-planner"}
 
 
 def run() -> None:

@@ -260,19 +260,19 @@ Phases 4, 5.
 
 #### Review Agent (full)
 
-- [ ] Replace stub: run evals on `PlanArtifact` and `EditArtifact`
-- [ ] On failure: one `RegenRequest` to **originating agent** (Planning or Edit)
-- [ ] Re-run failed evals; return `ReviewVerdict` with `eval_report`
-- [ ] Emit eval results to Observability
+- [x] Replace stub: run evals on `PlanArtifact` and `EditArtifact`
+- [x] On failure: one `RegenRequest` to **originating agent** (Planning or Edit)
+- [x] Re-run failed evals; return `ReviewVerdict` with `eval_report`
+- [x] Emit eval results to Observability
 
 #### Supervisor + Session Manager
 
-- [ ] Set `itinerary_approved` only on PASS / PASS_WITH_WARNINGS
-- [ ] On FAIL: do not approve; Supervisor explains to user
+- [x] Set `itinerary_approved` only on PASS / PASS_WITH_WARNINGS
+- [x] On FAIL: do not approve; Supervisor explains to user
 
 #### UI
 
-- [ ] Eval panel shows per-eval pass/fail from `last_eval_report`
+- [x] Eval panel shows per-eval pass/fail from `last_eval_report`
 
 ### Deliverables
 
@@ -305,9 +305,9 @@ Phases 4, 6.
 
 #### Deployment
 
-- [ ] n8n workflow in `workflows/`
-- [ ] Public HTTPS deploy
-- [ ] README: multi-agent architecture, Gateway, Session Manager, Observability, eval commands
+- [x] n8n workflow in `workflows/`
+- [x] Public HTTPS deploy (Vercel + Render; see `docs/deployment.md`)
+- [x] README: deployment, env vars, local dev
 - [ ] 5-minute demo script
 
 ### Deliverables

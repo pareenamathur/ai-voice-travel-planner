@@ -1,0 +1,98 @@
+{
+  "name": "Export Itinerary",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "export-itinerary",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1b2c3d4-export-webhook",
+      "name": "Export Itinerary Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 320],
+      "webhookId": "export-itinerary"
+    },
+    {
+      "parameters": {
+        "command": "python",
+        "arguments": "-m src.mcp_servers.export.runner",
+        "stdin": "={{ JSON.stringify($json.body ?? $json) }}"
+      },
+      "id": "a1b2c3d4-run-export",
+      "name": "Generate Export (Python)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [520, 320],
+      "notesInFlow": true,
+      "notes": "Requires n8n host with this repo on PYTHONPATH and fpdf2 installed. Webhook URL → N8N_EXPORT_WEBHOOK_URL."
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst raw = (item.stdout || '').trim();\nif (!raw) {\n  throw new Error(item.stderr || 'Export runner produced no stdout');\n}\nconst data = JSON.parse(raw);\nif (!data.content_base64) {\n  throw new Error('Runner response missing content_base64');\n}\nreturn [{ json: data }];"
+      },
+      "id": "a1b2c3d4-parse-export",
+      "name": "Parse Runner Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [780, 320]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "a1b2c3d4-respond-export",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1040, 320]
+    }
+  ],
+  "connections": {
+    "Export Itinerary Webhook": {
+      "main": [
+        [
+          {
+            "node": "Generate Export (Python)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Export (Python)": {
+      "main": [
+        [
+          {
+            "node": "Parse Runner Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Runner Output": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "voice-travel-planner-export"
+  },
+  "pinData": {},
+  "tags": []
+}

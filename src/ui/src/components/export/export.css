@@ -1,0 +1,89 @@
+.export-menu {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.export-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--on-surface, #e5e2e1);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.export-menu__trigger:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 185, 97, 0.35);
+}
+
+.export-menu__trigger:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.export-menu__dropdown {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 20;
+  min-width: 9rem;
+  margin: 0;
+  padding: 0.35rem;
+  list-style: none;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(18, 16, 28, 0.96);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.export-menu__option {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: none;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--on-surface, #e5e2e1);
+  text-align: left;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.export-menu__option:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.export-hint {
+  margin: 0;
+  max-width: 16rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--on-surface-variant, #d4c0d7);
+  opacity: 0.85;
+  text-align: right;
+}
+
+.export-toast {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  max-width: 14rem;
+  text-align: right;
+}
+
+.export-toast--success {
+  color: #8fd9a8;
+}
+
+.export-toast--error {
+  color: #ffb4a8;
+}

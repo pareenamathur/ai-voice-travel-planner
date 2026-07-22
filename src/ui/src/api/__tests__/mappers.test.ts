@@ -28,9 +28,42 @@ describe("evalReportFromVerdict", () => {
       eval_report: {
         entries: [{ name: "Feasibility", passed: true, reasons: [] }],
       },
+      regen_attempted: false,
     });
     expect(report?.overall_verdict).toBe("pass");
     expect(report?.entries).toHaveLength(1);
+    expect(report?.regen_attempted).toBe(false);
+  });
+
+  it("maps regen_attempted and FAIL status from ReviewVerdict", () => {
+    const report = evalReportFromVerdict({
+      status: "fail",
+      regen_attempted: true,
+      eval_report: {
+        entries: [
+          {
+            name: "feasibility",
+            passed: false,
+            reasons: ["day 1 over budget"],
+          },
+        ],
+      },
+    });
+    expect(report?.overall_verdict).toBe("fail");
+    expect(report?.regen_attempted).toBe(true);
+    expect(report?.entries?.[0]?.passed).toBe(false);
+  });
+
+  it("maps PASS_WITH_WARNINGS status", () => {
+    const report = evalReportFromVerdict({
+      status: "pass_with_warnings",
+      regen_attempted: true,
+      eval_report: {
+        entries: [{ name: "grounding", passed: true, reasons: ["soft warning"] }],
+      },
+    });
+    expect(report?.overall_verdict).toBe("pass_with_warnings");
+    expect(report?.regen_attempted).toBe(true);
   });
 });
 

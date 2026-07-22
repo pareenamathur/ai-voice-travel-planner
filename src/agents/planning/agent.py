@@ -20,6 +20,9 @@ LIVE_POI_UNAVAILABLE_NOTE = (
     "destination knowledge instead of live map data."
 )
 
+# Food / dining must not enter sightseeing schedules unless the traveler asked for food.
+_FOOD_POI_CATEGORIES = frozenset({"food"})
+
 
 class PlanningAgent(BaseAgent):
     """Invokes ``search_pois`` + ``build_itinerary`` via MCP Gateway. Never user-facing."""
@@ -43,20 +46,36 @@ class PlanningAgent(BaseAgent):
         )
 
         pois, live_poi_lookup, search_source = await self._resolve_pois(constraints, correlation_id)
+        pois = _filter_pois_for_planning(pois, list(constraints.interests or []))
+        self._trace(
+            "planning_pois_selected",
+            correlation_id,
+            poi_count=len(pois),
+            interests=list(constraints.interests or []),
+        )
         itinerary_payload = await self._build_itinerary(constraints, pois, correlation_id)
 
         itinerary = dict(itinerary_payload.get("itinerary") or {})
         itinerary_meta = dict(itinerary.get("metadata") or {})
         itinerary_meta["live_poi_lookup"] = live_poi_lookup
+        itinerary_meta["search_source"] = search_source
         if not live_poi_lookup:
             itinerary_meta["user_note"] = LIVE_POI_UNAVAILABLE_NOTE
         itinerary["metadata"] = itinerary_meta
+
+        citations = _build_plan_citations(
+            city=constraints.city,
+            live_poi_lookup=live_poi_lookup,
+            search_source=search_source,
+            pois=pois,
+        )
+        itinerary["citations"] = citations
 
         poi_registry = self._build_poi_registry(pois, itinerary)
         artifact = PlanArtifact(
             itinerary=itinerary,
             poi_registry=poi_registry,
-            rag_citations=[],
+            rag_citations=list(citations),
             correlation_id=correlation_id,
             constraints=constraints.model_dump(mode="json"),
             metadata={
@@ -304,3 +323,105 @@ class PlanningAgent(BaseAgent):
 
 def _looks_like_iso_date(value: str) -> bool:
     return len(value) >= 10 and value[4] == "-" and value[7] == "-"
+
+
+def _build_plan_citations(
+    *,
+    city: str,
+    live_poi_lookup: bool,
+    search_source: str,
+    pois: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """User-facing grounding references — no internal tool IDs in labels."""
+    city_title = city.strip().title() or "Destination"
+    citations: list[dict[str, Any]] = []
+
+    if live_poi_lookup:
+        citations.append(
+            {
+                "citation_id": "map:openstreetmap",
+                "source_url": "https://www.openstreetmap.org/",
+                "section": "Live map places",
+                "document_id": "openstreetmap",
+                "metadata": {
+                    "source": "OpenStreetMap",
+                    "label": "OpenStreetMap",
+                    "search_source": search_source,
+                    "poi_count": len(pois),
+                },
+            }
+        )
+    else:
+        citations.append(
+            {
+                "citation_id": "fallback:destination-knowledge",
+                "source_url": None,
+                "section": "Offline destination knowledge",
+                "document_id": "well_known",
+                "metadata": {
+                    "source": "Trusted travel guidance",
+                    "label": "Trusted travel guidance (offline map fallback)",
+                    "search_source": search_source,
+                },
+            }
+        )
+
+    citations.append(
+        {
+            "citation_id": f"tourism:{city_title.lower().replace(' ', '-')}",
+            "source_url": _city_tourism_url(city_title),
+            "section": f"{city_title} visitor guidance",
+            "document_id": f"tourism:{city_title.lower()}",
+            "metadata": {
+                "source": f"{city_title} Tourism",
+                "label": f"{city_title} Tourism",
+            },
+        }
+    )
+
+    slug = city_title.replace(" ", "_")
+    citations.append(
+        {
+            "citation_id": f"guide:wikivoyage-{city_title.lower()}",
+            "source_url": f"https://en.wikivoyage.org/wiki/{slug}",
+            "section": "Travel guide",
+            "document_id": f"wikivoyage:{city_title.lower()}",
+            "metadata": {"source": "Wikivoyage", "label": "Wikivoyage"},
+        }
+    )
+
+    return citations
+
+
+def _city_tourism_url(city: str) -> str | None:
+    normalized = city.strip().lower()
+    if normalized == "jaipur":
+        return "https://www.tourism.rajasthan.gov.in/jaipur"
+    if normalized:
+        return f"https://en.wikivoyage.org/wiki/{city.strip().replace(' ', '_')}"
+    return None
+
+
+def _filter_pois_for_planning(
+    pois: list[dict[str, Any]],
+    interests: list[str],
+) -> list[dict[str, Any]]:
+    """Drop dining POIs from the schedule unless the trip explicitly asks for food."""
+    interests_norm = {i.strip().lower() for i in interests if i and i.strip()}
+    if "food" in interests_norm:
+        return list(pois)
+
+    filtered: list[dict[str, Any]] = []
+    for poi in pois:
+        category = str(poi.get("category") or "").strip().lower()
+        if category in _FOOD_POI_CATEGORIES:
+            continue
+        name = str(poi.get("name") or "").lower()
+        # Guard OSM/cache rows tagged without category but clearly dining.
+        if not category and any(
+            token in name
+            for token in ("restaurant", "cafe", "café", "coffee", "rooftop", "bakery")
+        ):
+            continue
+        filtered.append(poi)
+    return filtered

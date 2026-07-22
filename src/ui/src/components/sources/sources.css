@@ -116,6 +116,52 @@
   text-underline-offset: 2px;
 }
 
+.source-links {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.source-links__title {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--on-surface-variant, #d4c0d7);
+}
+
+.source-links__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+}
+
+.source-links__anchor {
+  color: var(--secondary-container, #00eefc);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-size: 0.875rem;
+}
+
+.source-links__anchor:hover,
+.source-links__anchor:focus-visible {
+  color: var(--primary, #ecb2ff);
+}
+
+.source-links__plain {
+  font-size: 0.875rem;
+  color: var(--on-surface, #e5e2e1);
+}
+
+.itinerary-view__sources.source-links {
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
 .citation-card__url:hover,
 .citation-card__url:focus-visible {
   color: var(--primary, #ecb2ff);

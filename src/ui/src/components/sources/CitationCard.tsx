@@ -11,6 +11,7 @@ export function CitationCard({ citation, index }: CitationCardProps) {
   const label = deriveCitationLabel(citation);
   const section = citation.section?.trim() || null;
   const url = citation.source_url?.trim() || null;
+  const displayName = label || source || section || "Travel reference";
 
   return (
     <article
@@ -22,26 +23,20 @@ export function CitationCard({ citation, index }: CitationCardProps) {
         <span className="citation-card__index" data-testid="citation-index">
           [{index}]
         </span>
-        {label ? (
-          <span className="citation-card__label" data-testid="citation-label">
-            {label}
-          </span>
-        ) : null}
+        <span className="citation-card__label" data-testid="citation-label">
+          {displayName}
+        </span>
       </header>
 
-      <p className="citation-card__id" data-testid="citation-id">
-        {citation.citation_id}
-      </p>
-
-      {source ? (
+      {source && source !== displayName ? (
         <p className="citation-card__source" data-testid="citation-source">
           Source: {source}
         </p>
       ) : null}
 
-      {section ? (
+      {section && section !== displayName ? (
         <p className="citation-card__section" data-testid="citation-section">
-          Section: {section}
+          {section}
         </p>
       ) : null}
 

@@ -175,4 +175,69 @@ def test_activities_start_within_sightseeing_window():
         for activity in day.activities:
             assert activity.start_time is not None
             hour = int(activity.start_time.split(":")[0])
-            assert 9 <= hour <= 18
+            assert 9 <= hour <= 21
+
+
+def test_schedule_day_fills_full_day_with_meals_and_evening():
+    itinerary = schedule_itinerary(
+        city="jaipur",
+        pois=[CITY_PALACE, HAWA_MAHAL, JANTAR_MANTAR, ALBERT_HALL],
+        total_days=1,
+        traveler_constraints=TravelerConstraints(pace="moderate"),
+    )
+    day = itinerary.days[0]
+    titles = [a.title for a in day.activities]
+    notes = [str(a.notes or "") for a in day.activities]
+    assert any("Lunch" in t or "Lunch" in n for t, n in zip(titles, notes))
+    assert any("Dinner" in t or "Dinner" in n for t, n in zip(titles, notes))
+    assert any("hotel" in n.lower() or "Return" in t for t, n in zip(titles, notes))
+    assert any(a.start_time and a.start_time >= "17:00" for a in day.activities)
+    assert len(day.travel_segments) >= 1
+    assert all(seg.travel_minutes >= 0 for seg in day.travel_segments)
+    assert all(
+        a.duration_minutes is not None and a.duration_minutes > 0 for a in day.activities
+    )
+
+
+def test_schedule_day_includes_evening_poi_before_dinner():
+    market = POI(
+        osm_id="node/market",
+        name="Old City Market",
+        lat=26.9230,
+        lon=75.8260,
+        category="shopping",
+    )
+    park = POI(
+        osm_id="node/park",
+        name="Central Gardens",
+        lat=26.9120,
+        lon=75.8200,
+        category="nature",
+    )
+    itinerary = schedule_itinerary(
+        city="demo-city",
+        pois=[CITY_PALACE, HAWA_MAHAL, market, park],
+        total_days=1,
+        traveler_constraints=TravelerConstraints(pace="moderate"),
+    )
+    day = itinerary.days[0]
+    poi_acts = [a for a in day.activities if a.poi_id and a.category not in {"food", "rest"}]
+    dinner_idx = next(
+        (i for i, a in enumerate(day.activities) if (a.notes or "") == "Dinner" or a.title == "Dinner"),
+        None,
+    )
+    assert dinner_idx is not None
+    evening_before_dinner = [
+        a
+        for i, a in enumerate(day.activities)
+        if i < dinner_idx
+        and a.poi_id
+        and a.category not in {"food", "rest"}
+        and a.start_time
+        and a.start_time >= "17:00"
+    ]
+    assert evening_before_dinner, "expected a real evening stop before dinner"
+    assert any(
+        a.poi_id in {"node/market", "node/park"} for a in evening_before_dinner
+    )
+    assert len(poi_acts) >= 2

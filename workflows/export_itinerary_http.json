@@ -1,0 +1,93 @@
+{
+  "name": "Export Itinerary (HTTP — n8n Cloud / Render)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "export-itinerary",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b1b2c3d4-export-webhook",
+      "name": "Export Itinerary Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 320],
+      "webhookId": "export-itinerary"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_EXPORT_RENDER_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Export-Render-Key",
+              "value": "={{ $env.EXPORT_RENDER_SECRET }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body ?? $json) }}",
+        "options": {}
+      },
+      "id": "b1b2c3d4-http-render",
+      "name": "Render via API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 320],
+      "notesInFlow": true,
+      "notes": "Set n8n env API_EXPORT_RENDER_URL to https://<api-host>/api/internal/export/render and EXPORT_RENDER_SECRET to match backend."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "b1b2c3d4-respond-export",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [780, 320]
+    }
+  ],
+  "connections": {
+    "Export Itinerary Webhook": {
+      "main": [
+        [
+          {
+            "node": "Render via API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render via API": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "export-itinerary-http-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

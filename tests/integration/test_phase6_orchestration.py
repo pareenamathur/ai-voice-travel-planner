@@ -115,6 +115,17 @@ def gateway(obs: Observability, itinerary_service: ItineraryBuilderService) -> M
         }
 
     gw.register("retrieve_guidance", _retrieve_guidance)
+
+    async def _search_pois(**kwargs: Any) -> dict[str, Any]:
+        return {
+            "pois": [
+                {"osm_id": "f1", "name": "Peacock Rooftop", "category": "food", "lat": 1, "lon": 1},
+            ],
+            "source": "test",
+            "live_poi_lookup": True,
+        }
+
+    gw.register("search_pois", _search_pois)
     return gw
 
 
@@ -162,7 +173,7 @@ async def test_edit_workflow_edit_review_supervisor(
     assert result["intent"] == TaskType.EDIT.value
     assert result["review_verdict"] is not None
     assert result["review_verdict"]["status"] == ReviewStatus.PASS.value
-    assert "updated for Day 2" in result["response"]
+    assert "Day 2" in result["response"] and "updated" in result["response"].lower()
     assert sessions.read(session.session_id).itinerary_approved is True
     assert sessions.read(session.session_id).itinerary["days"][0] == day_one_before
     assert sessions.read(session.session_id).itinerary["traveler_constraints"]["pace"] == "relaxed"
@@ -208,6 +219,7 @@ async def test_explain_workflow_bypasses_review(
 
     assert result["intent"] == TaskType.EXPLAIN.value
     assert result["review_verdict"] is None
+    assert result["itinerary"] is None
     assert "Amber Fort" in result["response"]
     review.run.assert_not_called()
     review.review_edit.assert_not_called()
@@ -221,6 +233,105 @@ async def test_explain_workflow_bypasses_review(
     events = [span.get("event") for span in spans]
     assert "supervisor_dispatch_knowledge" in events
     assert "review_started" not in events
+
+
+@pytest.mark.asyncio
+async def test_feasibility_and_rain_explain_omit_itinerary_payload(
+    sessions: SessionManager,
+    gateway: MCPGateway,
+    obs: Observability,
+    approved_itinerary: dict[str, Any],
+):
+    supervisor = _supervisor_with_real_edit_knowledge(sessions, gateway, obs)
+    session = sessions.create()
+    sessions.set_itinerary(session.session_id, approved_itinerary)
+    sessions.set_itinerary_approved(session.session_id, True)
+    sessions.record_eval_report(
+        session.session_id,
+        {
+            "entries": [
+                {"name": "feasibility", "passed": True, "reasons": []},
+                {"name": "grounding", "passed": True, "reasons": []},
+            ]
+        },
+        verdict="pass",
+    )
+
+    feasible = await supervisor.handle_message(
+        session.session_id,
+        "Is this plan doable?",
+        correlation_id="corr-phase6-feas",
+    )
+    assert feasible["intent"] == TaskType.EXPLAIN.value
+    assert feasible["itinerary"] is None
+    assert "feasible" in feasible["response"].lower() or "doable" in feasible["response"].lower()
+    assert "Day 1:" not in feasible["response"]
+
+    rain = await supervisor.handle_message(
+        session.session_id,
+        "What if it rains?",
+        correlation_id="corr-phase6-rain",
+    )
+    assert rain["intent"] == TaskType.EXPLAIN.value
+    assert rain["itinerary"] is None
+    assert "rain" in rain["response"].lower() or "indoor" in rain["response"].lower()
+    # Must not dump the day-by-day itinerary listing into the chat reply.
+    assert "Day 1:" not in rain["response"]
+    assert "Day 2:" not in rain["response"]
+
+
+@pytest.mark.asyncio
+async def test_recommend_workflow_uses_search_pois(
+    sessions: SessionManager,
+    gateway: MCPGateway,
+    obs: Observability,
+):
+    supervisor = _supervisor_with_real_edit_knowledge(sessions, gateway, obs)
+    session = sessions.create()
+    sessions.update_constraints(
+        session.session_id,
+        {"city": "jaipur", "days": 3},
+    )
+
+    result = await supervisor.handle_message(
+        session.session_id,
+        "Suggest food places in Jaipur",
+        correlation_id="corr-phase6-recommend",
+    )
+
+    assert result["intent"] == TaskType.RECOMMEND.value
+    assert result["review_verdict"] is None
+    assert result["itinerary"] is None
+    assert "Peacock Rooftop" in result["response"]
+
+
+@pytest.mark.asyncio
+async def test_recommend_does_not_regenerate_itinerary(
+    sessions: SessionManager,
+    gateway: MCPGateway,
+    obs: Observability,
+    approved_itinerary: dict[str, Any],
+):
+    supervisor = _supervisor_with_real_edit_knowledge(sessions, gateway, obs)
+    session = sessions.create()
+    sessions.set_itinerary(session.session_id, approved_itinerary)
+    sessions.set_itinerary_approved(session.session_id, True)
+    before = sessions.read(session.session_id).itinerary
+
+    result = await supervisor.handle_message(
+        session.session_id,
+        "Suggest food places in Jaipur",
+        correlation_id="corr-phase6-recommend-preserve",
+    )
+
+    assert result["intent"] == TaskType.RECOMMEND.value
+    after = sessions.read(session.session_id).itinerary
+    assert after is not None and before is not None
+    # RECOMMEND must not rebuild the plan; citations may be appended for Sources.
+    assert after["days"] == before["days"]
+    assert after["city"] == before["city"]
+    assert after["total_days"] == before["total_days"]
+    assert sessions.read(session.session_id).itinerary_approved is True
 
 
 @pytest.mark.asyncio

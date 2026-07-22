@@ -1,22 +1,26 @@
 /**
- * Companion UI shell — Aetheric Voyage presentation (Stitch source of truth).
- * Speech → POST /api/session/message → panels; trace via GET after success.
- * Backend contracts and useSupervisorSession wiring are unchanged.
+ * Consumer travel chat — Aetheric Voyage presentation.
+ * Hooks and API wiring unchanged; debug panels behind Developer Mode.
  */
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import {
-  ConversationHistory,
-  EvalStatusPanel,
-  ItineraryView,
-  SessionDebugPanel,
-  SourcesPanel,
-  SpeechPanel,
-  TracePanel,
-} from "./components";
-import { SideNav, TopBar, type AppNavId } from "./components/layout";
 import { useSupervisorSession } from "./api";
+import {
+  activeLoadingMessage,
+  isLongRunningHint,
+} from "./api/loadingHint";
+import { useLoadingProgress } from "./api/useLoadingProgress";
+import {
+  ChatComposer,
+  ChatThread,
+  DeveloperPanels,
+} from "./components/chat";
+import { ItineraryView, TripPanelBusy } from "./components/itinerary";
+import { ExportMenu } from "./components/export";
+import { collectSourceLinks } from "./components/sources/sourceLinks";
+
+const DEV_MODE_KEY = "vtp.developer_mode";
 
 export function App() {
   const {
@@ -31,226 +35,217 @@ export function App() {
     conversationHistory,
     confirmRejectedWarning,
     loading,
+    loadingHint,
+    itineraryRevision,
     traceLoading,
     error,
     submitTranscript,
-    supervisorReply,
   } = useSupervisorSession();
 
-  const [nav, setNav] = useState<AppNavId>("new-trip");
-  const showItineraryScreen = Boolean(itineraryApproved && itinerary);
+  const [developerMode, setDeveloperMode] = useState(() => {
+    try {
+      return sessionStorage.getItem(DEV_MODE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const handleNavigate = (id: AppNavId) => {
-    setNav(id);
-  };
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(DEV_MODE_KEY, developerMode ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [developerMode]);
 
-  // When an itinerary is approved, highlight Recent Trips in the shell.
-  const activeNav = showItineraryScreen && nav === "new-trip" ? "recent" : nav;
+  const toggleDeveloperMode = useCallback(() => {
+    setDeveloperMode((prev) => !prev);
+  }, []);
+
+  const sourceLinks = itinerary ? collectSourceLinks(itinerary) : [];
+
+  const busy = loading || traceLoading;
+  const loadingElapsed = useLoadingProgress(loading);
+  const statusMessage = loading
+    ? activeLoadingMessage(loadingHint, loadingElapsed)
+    : traceLoading
+      ? "Refreshing agent trace…"
+      : null;
+  const showTripSkeleton =
+    loading && isLongRunningHint(loadingHint) && !itinerary;
+  const showTripOverlay =
+    loading && (loadingHint === "plan" || loadingHint === "edit") && Boolean(itinerary);
 
   return (
-    <div className="app-shell" data-screen={showItineraryScreen ? "itinerary" : "home"}>
+    <div
+      className="app-shell app-shell--chat"
+      aria-busy={busy || undefined}
+    >
       <div className="app-atmosphere" aria-hidden="true">
         <div className="app-atmosphere__blob app-atmosphere__blob--primary" />
         <div className="app-atmosphere__blob app-atmosphere__blob--secondary" />
       </div>
 
-      <SideNav active={activeNav} onNavigate={handleNavigate} />
-
-      <div className="app-shell__workspace">
-        <TopBar
-          placeholder={
-            showItineraryScreen ? "Search itineraries..." : "Search destinations..."
-          }
-        />
-
-        <main className="app-shell__main">
-          {loading ? (
-            <p className="app-shell__status" role="status" data-testid="loading-status">
-              Talking to Supervisor…
-            </p>
-          ) : null}
-
-          {traceLoading ? (
-            <p
-              className="app-shell__status"
-              role="status"
-              data-testid="trace-loading-status"
-            >
-              Loading agent trace…
-            </p>
-          ) : null}
-
-          {error ? (
-            <p className="app-shell__error" role="alert" data-testid="api-error">
-              {error}
-            </p>
-          ) : null}
-
-          {!showItineraryScreen ? (
-            <section className="home-hero" aria-label="Plan with voice">
-              <h2 className="home-hero__title">Plan your perfect trip with AI</h2>
-              <p className="home-hero__subtitle">
-                Speak your desires into existence. Our neural engine crafts bespoke
-                journeys across the globe, tailored to your exact rhythm.
-              </p>
-            </section>
-          ) : null}
-
-          {showItineraryScreen && itinerary ? (
-            <section className="itinerary-hero" aria-label="Trip summary">
-              <nav className="itinerary-hero__crumbs" aria-label="Breadcrumb">
-                <span>Recent Trips</span>
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  chevron_right
-                </span>
-                <span className="itinerary-hero__crumb-current">
-                  {itinerary.city} Expedition
-                </span>
-              </nav>
-              <div className="itinerary-hero__row">
-                <div>
-                  <h2 className="itinerary-hero__title">
-                    The {titleCase(itinerary.city)} Experience
-                  </h2>
-                  <div className="itinerary-hero__chips">
-                    <span className="chip">
-                      <span className="material-symbols-outlined" aria-hidden="true">
-                        location_on
-                      </span>
-                      {titleCase(itinerary.city)}
-                    </span>
-                    <span className="chip">
-                      <span className="material-symbols-outlined" aria-hidden="true">
-                        calendar_today
-                      </span>
-                      {itinerary.total_days}{" "}
-                      {itinerary.total_days === 1 ? "Day" : "Days"}
-                    </span>
-                    {itinerary.traveler_constraints?.pace ? (
-                      <span className="chip">
-                        <span className="material-symbols-outlined" aria-hidden="true">
-                          spa
-                        </span>
-                        {titleCase(String(itinerary.traveler_constraints.pace))}
-                      </span>
-                    ) : null}
-                    {(itinerary.traveler_constraints?.interests ?? [])
-                      .slice(0, 2)
-                      .map((interest) => (
-                        <span className="chip" key={interest}>
-                          <span className="material-symbols-outlined" aria-hidden="true">
-                            restaurant
-                          </span>
-                          {titleCase(interest)}
-                        </span>
-                      ))}
-                  </div>
-                </div>
-                <div className="itinerary-hero__actions">
-                  <button type="button" className="btn-ghost">
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      share
-                    </span>
-                    Share Trip
-                  </button>
-                  <button type="button" className="btn-primary">
-                    <span className="material-symbols-outlined" aria-hidden="true">
-                      picture_as_pdf
-                    </span>
-                    Export PDF
-                  </button>
-                </div>
-              </div>
-
-              {supervisorReply ? (
-                <div className="ai-greeting glass-card">
-                  <div className="ai-greeting__icon" aria-hidden="true">
-                    <span className="material-symbols-outlined">auto_awesome</span>
-                  </div>
-                  <div>
-                    <h3 className="ai-greeting__title">
-                      Your {titleCase(itinerary.city)} journey is ready.
-                    </h3>
-                    <p className="ai-greeting__body">{supervisorReply}</p>
-                  </div>
-                </div>
-              ) : null}
-            </section>
-          ) : null}
-
-          <div
-            className={
-              showItineraryScreen
-                ? "app-shell__voice app-shell__voice--compact"
-                : "app-shell__voice"
-            }
-          >
-            <SpeechPanel
-              onSubmitTranscript={submitTranscript}
-              submitDisabled={loading}
-            />
+      <header className="chat-header">
+        <div className="chat-header__brand">
+          <span className="chat-header__logo" aria-hidden="true">
+            <span className="material-symbols-outlined">flight_takeoff</span>
+          </span>
+          <div>
+            <h1 className="chat-header__title">Aether Travel</h1>
+            <p className="chat-header__tagline">Your AI journey companion</p>
           </div>
+        </div>
 
-          <div
-            className={
-              showItineraryScreen
-                ? "app-shell__itinerary"
-                : "app-shell__itinerary app-shell__itinerary--muted"
-            }
+        <div className="chat-header__actions">
+          <button
+            type="button"
+            className={`chat-header__icon-btn${developerMode ? " chat-header__icon-btn--active" : ""}`}
+            aria-label={developerMode ? "Developer mode on" : "Developer mode off"}
+            title="Developer mode"
+            aria-pressed={developerMode}
+            onClick={toggleDeveloperMode}
+            data-testid="developer-mode-toggle"
           >
-            <ItineraryView itinerary={itinerary} />
-          </div>
+            <span className="material-symbols-outlined">code</span>
+          </button>
+          <button
+            type="button"
+            className="chat-header__icon-btn"
+            aria-label="Settings"
+            aria-expanded={settingsOpen}
+            onClick={() => setSettingsOpen((open) => !open)}
+            data-testid="settings-toggle"
+          >
+            <span className="material-symbols-outlined">settings</span>
+          </button>
+        </div>
 
-          <details className="meta-drawer glass-card" open>
-            <summary className="meta-drawer__summary">
-              <span className="meta-drawer__summary-left">
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  analytics
-                </span>
-                <span className="meta-drawer__label">Sources &amp; Metadata</span>
-              </span>
-              <span className="material-symbols-outlined" aria-hidden="true">
-                expand_more
-              </span>
-            </summary>
-            <div className="meta-drawer__body">
-              <SourcesPanel itinerary={itinerary ?? undefined} />
-              <TracePanel items={traceItems} />
-              <EvalStatusPanel report={evalReport} />
-            </div>
-          </details>
-
-          <details className="meta-drawer glass-card meta-drawer--debug" open>
-            <summary className="meta-drawer__summary">
-              <span className="meta-drawer__summary-left">
-                <span className="material-symbols-outlined" aria-hidden="true">
-                  bug_report
-                </span>
-                <span className="meta-drawer__label">Session Debug</span>
-              </span>
-              <span className="material-symbols-outlined" aria-hidden="true">
-                expand_more
-              </span>
-            </summary>
-            <div className="meta-drawer__body">
-              <SessionDebugPanel
-                sessionId={sessionId}
-                conversationPhase={conversationPhase}
-                intent={intent}
-                taskMessage={taskMessage}
-                itineraryApproved={itineraryApproved}
-                confirmRejectedWarning={confirmRejectedWarning}
+        {settingsOpen ? (
+          <div className="chat-settings glass-card" role="dialog" aria-label="Settings">
+            <h2 className="chat-settings__title">Settings</h2>
+            <label className="chat-settings__row">
+              <span>Developer mode</span>
+              <input
+                type="checkbox"
+                checked={developerMode}
+                onChange={(event) => setDeveloperMode(event.target.checked)}
+                data-testid="settings-developer-mode"
               />
-              <ConversationHistory exchanges={conversationHistory} />
-            </div>
-          </details>
-        </main>
-      </div>
+            </label>
+            <p className="chat-settings__hint">
+              Shows sources, quality checks, session details, and legacy voice panel for
+              debugging.
+            </p>
+            <button
+              type="button"
+              className="chat-settings__close"
+              onClick={() => setSettingsOpen(false)}
+            >
+              Done
+            </button>
+          </div>
+        ) : null}
+      </header>
+
+      <main id="main-content" className="chat-layout">
+        {!error && statusMessage ? (
+          <p className="app-shell__status chat-layout__status" role="status" data-testid="loading-status">
+            {statusMessage}
+          </p>
+        ) : null}
+
+        {!error && !statusMessage && traceLoading ? (
+          <p
+            className="app-shell__status chat-layout__status"
+            role="status"
+            data-testid="trace-loading-status"
+          >
+            Refreshing agent trace…
+          </p>
+        ) : null}
+
+        {error ? (
+          <p className="app-shell__error chat-layout__status" role="alert" data-testid="api-error">
+            {error}
+          </p>
+        ) : null}
+
+        <div
+          className={`chat-layout__body${
+            itinerary || showTripSkeleton ? " chat-layout__body--split" : ""
+          }`}
+        >
+          <ChatThread
+            exchanges={conversationHistory}
+            loading={loading}
+            loadingHint={loadingHint}
+            loadingElapsedSec={loadingElapsed}
+            itineraryApproved={itineraryApproved}
+            sourceLinks={sourceLinks}
+            onSuggestionSelect={(prompt) => {
+              void submitTranscript(prompt);
+            }}
+            suggestionsDisabled={loading}
+          />
+
+          {showTripSkeleton ? (
+            <TripPanelBusy hint={loadingHint} mode="skeleton" />
+          ) : itinerary ? (
+            <aside
+              key={itineraryRevision}
+              className={[
+                "trip-panel",
+                "glass-card",
+                "trip-panel--fresh",
+                showTripOverlay ? "trip-panel--busy" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              data-testid="trip-panel"
+              aria-label="Trip itinerary"
+              aria-busy={showTripOverlay || undefined}
+            >
+              {showTripOverlay ? (
+                <TripPanelBusy hint={loadingHint} mode="overlay" />
+              ) : null}
+              <div className="trip-panel__header">
+                <div className="trip-panel__header-text">
+                  <h2 className="trip-panel__title">Your trip</h2>
+                  <p className="trip-panel__status">
+                    {itineraryApproved ? "Approved" : "Draft"}
+                  </p>
+                </div>
+                <ExportMenu sessionId={sessionId} approved={itineraryApproved} />
+              </div>
+              <ItineraryView itinerary={itinerary} />
+            </aside>
+          ) : null}
+        </div>
+
+        <DeveloperPanels
+          visible={developerMode}
+          sessionId={sessionId}
+          conversationPhase={conversationPhase}
+          intent={intent}
+          taskMessage={taskMessage}
+          itineraryApproved={itineraryApproved}
+          confirmRejectedWarning={confirmRejectedWarning}
+          conversationHistory={conversationHistory}
+          itinerary={itinerary}
+          evalReport={evalReport}
+          traceItems={traceItems}
+          onSubmitTranscript={submitTranscript}
+          submitDisabled={loading}
+        />
+      </main>
+
+      <ChatComposer
+        onSubmitTranscript={submitTranscript}
+        submitDisabled={loading}
+        busy={loading}
+      />
     </div>
   );
-}
-
-function titleCase(value: string): string {
-  if (!value) return value;
-  return value.charAt(0).toUpperCase() + value.slice(1);
 }

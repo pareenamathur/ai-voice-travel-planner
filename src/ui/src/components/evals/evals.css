@@ -175,6 +175,27 @@
   color: var(--eval-ink);
 }
 
+.eval-status-panel__regen,
+.eval-status-panel__approval-warning {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.75rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.eval-status-panel__regen {
+  border: 1px solid color-mix(in srgb, var(--eval-warning) 45%, transparent);
+  background: color-mix(in srgb, var(--eval-warning) 12%, transparent);
+  color: var(--eval-ink);
+}
+
+.eval-status-panel__approval-warning {
+  border: 1px solid color-mix(in srgb, var(--eval-fail) 45%, transparent);
+  background: color-mix(in srgb, var(--eval-fail) 12%, transparent);
+  color: var(--eval-ink);
+}
+
 @media (min-width: 720px) {
   .eval-status-panel {
     max-height: 36rem;

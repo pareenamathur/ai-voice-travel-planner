@@ -191,8 +191,11 @@ async def test_rebuild_day_without_pois_reuses_existing_day_pois(service: Itiner
     )
     updated = rebuilt["itinerary"]["days"][0]
 
-    assert len(updated["activities"]) == len(day_before["activities"])
-    assert updated["activities"][0]["poi_id"] == day_before["activities"][0]["poi_id"]
+    before_sights = [a["poi_id"] for a in day_before["activities"] if a.get("poi_id")]
+    after_sights = [a["poi_id"] for a in updated["activities"] if a.get("poi_id")]
+    # Pace change may add/remove meal/rest slots; sightseeing POIs stay the same.
+    assert set(after_sights) == set(before_sights)
+    assert len(after_sights) == len(before_sights)
 
 
 @pytest.mark.asyncio

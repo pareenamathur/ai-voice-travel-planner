@@ -44,11 +44,23 @@ describe("ItineraryView", () => {
     const activities = within(day).getAllByTestId("activity-card");
     expect(activities).toHaveLength(2);
     expect(activities[0]).toHaveTextContent("City Palace");
+    expect(activities[0]).toHaveTextContent("Duration: 2h");
     expect(activities[1]).toHaveTextContent("Lunch near Hawa Mahal");
 
     expect(within(day).getByTestId("travel-segment")).toBeInTheDocument();
     expect(within(day).getByTestId("travel-minutes")).toHaveTextContent("15 min");
     expect(within(day).getByTestId("transport-mode")).toHaveTextContent("walk");
+    expect(screen.getByTestId("itinerary-sources")).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: "OpenStreetMap" });
+    expect(link).toHaveAttribute("href", "https://www.openstreetmap.org/");
+  });
+
+  it("renders friendly citation sources without internal ids", () => {
+    render(<ItineraryView itinerary={oneDayItinerary} />);
+    const sources = screen.getByTestId("itinerary-sources");
+    expect(sources).toHaveTextContent("OpenStreetMap");
+    expect(sources).not.toHaveTextContent("map:openstreetmap");
+    expect(sources).not.toHaveTextContent("node/");
   });
 
   it("renders multiple days in day_number order", () => {

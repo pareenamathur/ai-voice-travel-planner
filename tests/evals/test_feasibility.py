@@ -44,8 +44,9 @@ def test_healthy_day_passes() -> None:
 
 
 def test_overbudget_day_fails() -> None:
+    # 5 × 180 = 900 min exceeds the 720 min full-day budget.
     activities = [
-        {"id": f"d1-a{i}", "title": f"Stop {i}", "duration_minutes": 180} for i in range(1, 5)
+        {"id": f"d1-a{i}", "title": f"Stop {i}", "duration_minutes": 180} for i in range(1, 6)
     ]
     entry = evaluate_feasibility(_itinerary(activities=activities))
     assert not entry.passed
@@ -54,8 +55,8 @@ def test_overbudget_day_fails() -> None:
 
 def test_travel_counts_toward_daily_budget() -> None:
     activities = [
-        {"id": "d1-a1", "title": "A", "duration_minutes": 280},
-        {"id": "d1-a2", "title": "B", "duration_minutes": 280},
+        {"id": "d1-a1", "title": "A", "duration_minutes": 360},
+        {"id": "d1-a2", "title": "B", "duration_minutes": 360},
     ]
     segments = [
         {"from_activity_id": "d1-a1", "to_activity_id": "d1-a2", "travel_minutes": 60}
@@ -78,8 +79,9 @@ def test_single_travel_leg_over_threshold_fails() -> None:
 
 
 def test_relaxed_pace_activity_cap() -> None:
+    # Relaxed pace allows up to 8 activities including meal/rest slots.
     activities = [
-        {"id": f"d1-a{i}", "title": f"Stop {i}", "duration_minutes": 60} for i in range(1, 8)
+        {"id": f"d1-a{i}", "title": f"Stop {i}", "duration_minutes": 45} for i in range(1, 10)
     ]
     entry = evaluate_feasibility(_itinerary(pace="relaxed", activities=activities))
     assert not entry.passed

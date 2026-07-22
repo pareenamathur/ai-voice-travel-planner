@@ -92,3 +92,17 @@ export const backendEntriesReport: EvalReportData = {
     },
   ],
 };
+
+/** FAIL after one regeneration — used for regen + approval warning tests. */
+export const failAfterRegenReport: EvalReportData = {
+  overall_verdict: "fail",
+  regen_attempted: true,
+  entries: [
+    {
+      name: "feasibility",
+      passed: false,
+      reasons: ["day 1: scheduled 840 min exceeds the 600 min daily window"],
+    },
+    { name: "grounding", passed: true, reasons: [] },
+  ],
+};

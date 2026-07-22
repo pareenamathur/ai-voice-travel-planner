@@ -5,19 +5,32 @@ export interface ActivityCardProps {
   activity: Activity;
 }
 
-function periodLabel(startTime?: string | null): string | null {
-  if (!startTime) return null;
-  const hour = Number.parseInt(startTime.slice(0, 2), 10);
+function periodLabel(activity: Activity): string | null {
+  const notes = (activity.notes || "").toLowerCase();
+  if (notes.includes("lunch")) return "Lunch";
+  if (notes.includes("dinner")) return "Dinner";
+  if (notes.includes("tea")) return "Tea / Break";
+  if (notes.includes("night") || notes.includes("return") || notes.includes("hotel")) {
+    return "Night";
+  }
+  if (notes.includes("morning") && !notes.includes("late")) return "Morning";
+  if (notes.includes("afternoon")) return "Afternoon";
+  if (notes.includes("evening")) return "Evening";
+
+  if (!activity.start_time) return null;
+  const hour = Number.parseInt(activity.start_time.slice(0, 2), 10);
   if (Number.isNaN(hour)) return null;
-  if (hour < 12) return "Morning Activity";
-  if (hour < 17) return "Afternoon Activity";
-  return "Evening Experience";
+  if (hour < 12) return "Morning";
+  if (hour < 14) return "Late Morning";
+  if (hour < 17) return "Afternoon";
+  if (hour < 19) return "Evening";
+  return "Night";
 }
 
 export function ActivityCard({ activity }: ActivityCardProps) {
   const duration = formatDurationMinutes(activity.duration_minutes ?? null);
   const hasTime = Boolean(activity.start_time || activity.end_time);
-  const period = periodLabel(activity.start_time);
+  const period = periodLabel(activity);
 
   return (
     <article
@@ -52,11 +65,27 @@ export function ActivityCard({ activity }: ActivityCardProps) {
         </p>
       ) : null}
 
-      {activity.notes ? (
+      {activity.notes && !_isPeriodOnlyNote(activity.notes) ? (
         <p className="activity-card__notes" data-testid="activity-notes">
           {activity.notes}
         </p>
       ) : null}
     </article>
   );
+}
+
+function _isPeriodOnlyNote(notes: string): boolean {
+  const normalized = notes.trim().toLowerCase();
+  return [
+    "morning",
+    "late morning",
+    "late morning / midday",
+    "afternoon",
+    "early evening",
+    "evening",
+    "lunch",
+    "dinner",
+    "tea break",
+    "night — return / hotel",
+  ].includes(normalized);
 }

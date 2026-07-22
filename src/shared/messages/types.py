@@ -21,6 +21,7 @@ class TaskType(StrEnum):
     PLAN = "plan"
     EDIT = "edit"
     EXPLAIN = "explain"
+    RECOMMEND = "recommend"
     EXPORT = "export"
 
 

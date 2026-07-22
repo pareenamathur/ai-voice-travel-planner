@@ -1,0 +1,30 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Import this file in the Render dashboard (New > Blueprint).
+services:
+  - type: web
+    name: voice-travel-planner-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: CHAT_API_KEY
+        sync: false
+      - key: CHAT_MODEL
+        value: gpt-4o-mini
+      - key: EMBEDDING_API_KEY
+        sync: false
+      - key: EMBEDDING_MODEL
+        value: text-embedding-3-small
+      - key: N8N_EXPORT_WEBHOOK_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: EXPORT_RENDER_SECRET
+        sync: false
+      - key: LOG_LEVEL
+        value: INFO
+      - key: SESSION_TTL_SECONDS
+        value: "3600"

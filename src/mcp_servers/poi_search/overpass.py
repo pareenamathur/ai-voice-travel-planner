@@ -75,7 +75,11 @@ class OverpassClient:
         cache_path = self._cache_path(query)
 
         if use_cache and cache_path.exists():
-            return json.loads(cache_path.read_text(encoding="utf-8"))
+            cached = json.loads(cache_path.read_text(encoding="utf-8"))
+            # Empty HTTP-200 payloads used to be cached forever and poisoned live lookup.
+            if _has_overpass_elements(cached):
+                return cached
+            cache_path.unlink(missing_ok=True)
 
         headers = self._request_headers()
         last_error: OverpassError | None = None
@@ -87,11 +91,26 @@ class OverpassClient:
             for mirror_url in self.base_urls:
                 for attempt in range(self.max_attempts_per_mirror):
                     # Keep official form POST: application/x-www-form-urlencoded with data=<QL>.
-                    resp = await c.post(mirror_url, data={"data": query}, headers=headers)
+                    try:
+                        resp = await c.post(mirror_url, data={"data": query}, headers=headers)
+                    except (httpx.TimeoutException, httpx.TransportError) as exc:
+                        last_error = OverpassError(f"Overpass transport error: {exc}")
+                        if attempt < self.max_attempts_per_mirror - 1:
+                            delay = self.backoff_base_seconds * (2**attempt)
+                            await asyncio.sleep(delay)
+                            continue
+                        break
+
                     if resp.status_code == 200:
                         payload = resp.json()
-                        cache_path.write_text(json.dumps(payload), encoding="utf-8")
-                        return payload
+                        if _has_overpass_elements(payload):
+                            cache_path.write_text(json.dumps(payload), encoding="utf-8")
+                            return payload
+                        # Empty success — try next mirror instead of caching poison.
+                        last_error = OverpassError(
+                            "Overpass returned HTTP 200 with empty elements"
+                        )
+                        break
 
                     detail = f"Overpass HTTP {resp.status_code}: {resp.text[:200]}"
                     last_error = OverpassError(detail)
@@ -108,6 +127,11 @@ class OverpassClient:
 
         assert last_error is not None
         raise last_error
+
+
+def _has_overpass_elements(payload: dict[str, Any]) -> bool:
+    elements = payload.get("elements")
+    return isinstance(elements, list) and len(elements) > 0
 
 
 class _null_async_cm:

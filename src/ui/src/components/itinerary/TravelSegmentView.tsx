@@ -15,8 +15,11 @@ export function TravelSegmentView({ segment }: TravelSegmentViewProps) {
       data-testid="travel-segment"
       data-from={segment.from_activity_id}
       data-to={segment.to_activity_id}
-      aria-label={`Travel ${travelTime} by ${mode}`}
+      aria-label={`${travelTime} ${mode}`}
     >
+      <span className="travel-segment__arrow" aria-hidden="true">
+        ↓
+      </span>
       <span className="travel-segment__time" data-testid="travel-minutes">
         {travelTime}
       </span>

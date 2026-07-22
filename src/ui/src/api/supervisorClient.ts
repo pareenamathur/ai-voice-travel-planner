@@ -46,7 +46,7 @@ export function getApiBaseUrl(): string {
   return "";
 }
 
-async function parseError(response: Response): Promise<SupervisorApiError> {
+export async function parseError(response: Response): Promise<SupervisorApiError> {
   let detail = `Request failed (${response.status})`;
   try {
     const body = (await response.json()) as { detail?: unknown };

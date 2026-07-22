@@ -16,12 +16,13 @@ from src.shared.messages.types import EvalReportEntry
 
 EVAL_NAME = "feasibility"
 
-# Matches scheduler MAX_DAY_MINUTES (activities + travel per day).
-DEFAULT_DAILY_BUDGET_MINUTES = 600
+# Matches scheduler MAX_DAY_MINUTES (activities + travel + meal breaks per day).
+DEFAULT_DAILY_BUDGET_MINUTES = 720
 MAX_SINGLE_TRAVEL_MINUTES = 90
 MAX_DAILY_TRAVEL_MINUTES = 240
-MAX_ACTIVITIES_BY_PACE = {"relaxed": 5, "moderate": 7, "fast": 9, "packed": 9}
-DEFAULT_MAX_ACTIVITIES = 8
+# Includes lunch/tea/dinner/return slots produced by the full-day scheduler.
+MAX_ACTIVITIES_BY_PACE = {"relaxed": 8, "moderate": 10, "fast": 12, "packed": 12}
+DEFAULT_MAX_ACTIVITIES = 10
 
 
 def evaluate_feasibility(itinerary: dict[str, Any]) -> EvalReportEntry:

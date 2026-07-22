@@ -59,15 +59,67 @@ WELL_KNOWN_BY_CITY: dict[str, list[POI]] = {
             source="well_known",
             category="shopping",
         ),
+        POI(
+            osm_id="well_known/jaipur-lmb",
+            name="Laxmi Misthan Bhandar (LMB)",
+            lat=26.9190,
+            lon=75.8265,
+            source="well_known",
+            category="food",
+        ),
+        POI(
+            osm_id="well_known/jaipur-indian-coffee-house",
+            name="Indian Coffee House",
+            lat=26.9152,
+            lon=75.8189,
+            source="well_known",
+            category="food",
+        ),
+        POI(
+            osm_id="well_known/jaipur-peacock-rooftop",
+            name="Peacock Rooftop Restaurant",
+            lat=26.9245,
+            lon=75.8260,
+            source="well_known",
+            category="food",
+        ),
+        POI(
+            osm_id="well_known/jaipur-rawat-misthan",
+            name="Rawat Misthan Bhandar",
+            lat=26.9128,
+            lon=75.7878,
+            source="well_known",
+            category="food",
+        ),
+        POI(
+            osm_id="well_known/jaipur-chokhi-dhani",
+            name="Chokhi Dhani",
+            lat=26.7665,
+            lon=75.8360,
+            source="well_known",
+            category="food",
+        ),
     ],
 }
 
 
+# Dining / nightlife — available for Knowledge recommendations, not default sightseeing.
+_DINING_CATEGORIES = frozenset({"food"})
+
+
 def well_known_pois_for_city(city: str, *, interests: list[str] | None = None) -> list[dict[str, Any]]:
-    """Return curated attractions for a city, optionally filtered by interest category."""
+    """Return curated attractions for a city, optionally filtered by interest category.
+
+    Food POIs stay in the catalog for recommendations, but are excluded from the
+    default sightseeing set unless ``interests`` explicitly includes ``food``.
+    """
     key = (city or "").strip().lower()
     pois = list(WELL_KNOWN_BY_CITY.get(key) or _generic_city_pois(city))
     interests_norm = [i.strip().lower() for i in (interests or []) if i and i.strip()]
+    if "food" not in interests_norm:
+        pois = [
+            p for p in pois if (p.category or "").lower() not in _DINING_CATEGORIES
+        ]
     if interests_norm:
         matched = [
             p

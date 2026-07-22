@@ -12,6 +12,16 @@ export const oneDayItinerary: Itinerary = {
   city: "jaipur",
   total_days: 1,
   start_date: "2026-04-01",
+  metadata: { live_poi_lookup: true },
+  citations: [
+    {
+      citation_id: "map:openstreetmap",
+      source_url: "https://www.openstreetmap.org/",
+      section: "Live map places",
+      document_id: "openstreetmap",
+      metadata: { source: "OpenStreetMap", label: "OpenStreetMap" },
+    },
+  ],
   days: [
     {
       day_number: 1,

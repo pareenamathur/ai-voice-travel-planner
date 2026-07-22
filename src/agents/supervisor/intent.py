@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from src.agents.edit.intent import is_edit_message
+from src.agents.supervisor.recommend import is_recommend_message
 from src.shared.messages.types import ConversationPhase, TaskType, TripConstraints
 
 GREETING_RE = re.compile(
@@ -33,8 +34,34 @@ NEGATE_RE = re.compile(
 )
 
 _EXPLAIN_RE = re.compile(
-    r"(\?|^)\s*$|"
-    r"\b(why|what|how|when|tell me|explain|describe|more about|special about|best time)\b",
+    r"\b("
+    r"why|what|how|when|tell me|explain|describe|more about|special about|best time|"
+    r"why (?:this|that|did you)|what is special|why was this included"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# Trip-fit / logistics questions (require an existing itinerary in classify_intent).
+_ITINERARY_ADVISORY_RE = re.compile(
+    r"\b("
+    r"doable|feasible|realistic|too\s+hectic|too\s+busy|too\s+much\s+walking|"
+    r"comfortably|overwhelming|overpacked|rushed|rushing|"
+    r"kid[- ]?friendly|child(?:ren)?|toddler|family[- ]?friendly|"
+    r"senior\s+citizen|elderly|older\s+parents?|wheelchair|accessible|accessibility|"
+    r"\bsafe(?:ty)?\b|solo\s+travell?er|scam|"
+    r"monsoon|during\s+summer|in\s+summer|summer\s+heat|"
+    r"pack(?:ing)?|what\s+should\s+i\s+(?:carry|bring|wear)|"
+    r"expensive|budget[- ]?friendly|cost(?:ly)?|"
+    r"public\s+transport|need\s+a\s+taxi|"
+    r"suitable\s+for|suitable\s+during|"
+    r"parents|"
+    r"can\s+i\s+do\s+this"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_TRIP_CONTEXT_RE = re.compile(
+    r"\b(this|it|the\s+plan|the\s+itinerary|my\s+trip|this\s+plan|this\s+itinerary)\b",
     re.IGNORECASE,
 )
 
@@ -107,13 +134,37 @@ def is_explicit_confirmation(message: str) -> bool:
     return bool(CONFIRM_RE.match(text))
 
 
+def is_itinerary_advisory_message(message: str) -> bool:
+    """Feasibility, suitability, safety, weather, logistics — not slot confirmation."""
+    text = (message or "").strip()
+    if not text:
+        return False
+    if is_edit_message(text) or is_recommend_message(text):
+        return False
+    if is_explicit_confirmation(text):
+        return False
+    if _ITINERARY_ADVISORY_RE.search(text):
+        return True
+    if text.endswith("?") and _TRIP_CONTEXT_RE.search(text):
+        return True
+    return False
+
+
 def is_explain_message(message: str) -> bool:
     text = (message or "").strip()
     if not text:
         return False
     if is_edit_message(text):
         return False
+    if is_recommend_message(text):
+        return False
+    if is_itinerary_advisory_message(text):
+        return True
     return bool(_EXPLAIN_RE.search(text))
+
+
+def _has_destination_context(*, constraints: TripConstraints, has_itinerary: bool) -> bool:
+    return has_itinerary or bool(constraints.city)
 
 
 def classify_intent(
@@ -125,19 +176,25 @@ def classify_intent(
     has_itinerary: bool = False,
     itinerary_approved: bool = False,
 ) -> TaskType:
-    """Classify user intent into CLARIFY, CONFIRM, PLAN, EDIT, or EXPLAIN."""
-    if is_explicit_confirmation(message) and phase == ConversationPhase.CONFIRM and has_sufficient:
-        return TaskType.PLAN
-
+    """Classify user intent: EDIT → RECOMMEND → EXPLAIN → PLAN → CONFIRM → CLARIFY."""
     if itinerary_approved and is_edit_message(message):
         return TaskType.EDIT
+
+    if _has_destination_context(constraints=constraints, has_itinerary=has_itinerary):
+        if is_recommend_message(message):
+            return TaskType.RECOMMEND
 
     if has_itinerary and is_explain_message(message):
         return TaskType.EXPLAIN
 
+    if is_explicit_confirmation(message) and phase == ConversationPhase.CONFIRM and has_sufficient:
+        return TaskType.PLAN
+
     if has_sufficient:
-        # User may still be refining slots while in CONFIRM; stay on CONFIRM
-        # unless they explicitly confirmed (handled above).
+        if has_itinerary and not is_explicit_confirmation(message):
+            stripped = (message or "").strip()
+            if stripped.endswith("?") or is_itinerary_advisory_message(message):
+                return TaskType.EXPLAIN
         return TaskType.CONFIRM
 
     if is_greeting(message) and not constraints.city and constraints.days is None:

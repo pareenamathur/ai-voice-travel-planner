@@ -62,6 +62,27 @@ class Settings(BaseSettings):
     chroma_persist_dir: Path = Path("data/rag/index/chroma")
     chroma_collection_name: str = "travel_guidance"
 
+    # Phase 8 — n8n export webhook (Export Agent via Gateway trigger_export)
+    n8n_export_webhook_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("N8N_EXPORT_WEBHOOK_URL", "n8n_export_webhook_url"),
+    )
+
+    # Production — comma-separated browser origins allowed to call the API (CORS)
+    cors_origins: str = Field(
+        default="http://127.0.0.1:5173,http://localhost:5173",
+        validation_alias=AliasChoices("CORS_ORIGINS", "cors_origins"),
+    )
+
+    # Shared secret for n8n HTTP export workflow → POST /api/internal/export/render
+    export_render_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("EXPORT_RENDER_SECRET", "export_render_secret"),
+    )
+
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
     def overpass_urls(self) -> list[str]:
         """Primary Overpass URL plus configured mirrors (deduplicated, order preserved)."""
         urls: list[str] = []

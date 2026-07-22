@@ -10,13 +10,46 @@ from src.rag.retriever import SemanticRetriever, retrieve
 
 def _chunk_to_citation(chunk: RetrievedChunk) -> dict[str, Any]:
     meta = chunk.chunk.metadata or {}
+    document_id = meta.get("document_id") or chunk.chunk.doc_id
+    source_url = chunk.chunk.source_url
+    friendly = _friendly_rag_label(document_id, source_url, chunk.chunk.section)
     return {
         "citation_id": chunk.chunk.citation_id or chunk.chunk.chunk_id,
-        "source_url": chunk.chunk.source_url,
+        "source_url": source_url,
         "section": chunk.chunk.section,
-        "document_id": meta.get("document_id") or chunk.chunk.doc_id,
+        "document_id": document_id,
         "score": chunk.score,
+        "metadata": {
+            **dict(meta),
+            "source": friendly,
+            "label": friendly,
+        },
     }
+
+
+def _friendly_rag_label(
+    document_id: Any,
+    source_url: str | None,
+    section: str | None,
+) -> str:
+    blob = f"{document_id or ''} {source_url or ''} {section or ''}".lower()
+    if "wikivoyage" in blob:
+        return "Wikivoyage"
+    if "wikipedia" in blob:
+        return "Wikipedia"
+    if "rajasthan" in blob:
+        return "Rajasthan Tourism"
+    if "jaipur" in blob and "tourism" in blob:
+        return "Jaipur Tourism"
+    if "tourism" in blob:
+        return "Official tourism guides"
+    if section and str(section).strip():
+        return str(section).strip()
+    if document_id:
+        text = str(document_id)
+        parts = text.split(":")
+        return parts[-1].replace("_", " ").replace("-", " ").title()
+    return "Travel guidance"
 
 
 def _chunk_to_payload(chunk: RetrievedChunk) -> dict[str, Any]:

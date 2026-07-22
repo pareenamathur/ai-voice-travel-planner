@@ -145,7 +145,12 @@ async def test_valid_plan_flow_returns_plan_artifact(
     assert artifact.metadata["tools_used"] == ["search_pois", "build_itinerary"]
     assert artifact.metadata["live_poi_lookup"] is True
     assert artifact.itinerary["metadata"]["live_poi_lookup"] is True
-    assert artifact.rag_citations == []
+    assert len(artifact.rag_citations) >= 1
+    assert any(
+        (c.get("metadata") or {}).get("label") == "OpenStreetMap" for c in artifact.rag_citations
+    )
+    assert artifact.itinerary.get("citations")
+    assert "user_note" not in artifact.itinerary["metadata"]
 
     # Canonical itinerary validates against shared schema.
     itinerary = Itinerary.model_validate(artifact.itinerary)
@@ -286,6 +291,11 @@ async def test_overpass_error_falls_back_without_aborting_plan(obs: Observabilit
     assert artifact.itinerary["metadata"]["live_poi_lookup"] is False
     assert artifact.itinerary["metadata"]["user_note"] == LIVE_POI_UNAVAILABLE_NOTE
     assert artifact.metadata["live_poi_lookup"] is False
+    assert any(
+        "fallback" in str((c.get("metadata") or {}).get("label") or "").lower()
+        or "trusted" in str((c.get("metadata") or {}).get("label") or "").lower()
+        for c in artifact.rag_citations
+    )
     assert len(artifact.poi_registry) >= 1
 
     tool_names = [name for _, name, _ in gateway.calls]
@@ -315,3 +325,97 @@ async def test_empty_poi_search_falls_back_to_llm_well_known(obs: Observability)
     assert artifact.itinerary["metadata"]["live_poi_lookup"] is False
     assert gateway.calls[1][2]["pois"]
     assert artifact.metadata["search_source"] in {"llm", "well_known"}
+
+
+@pytest.mark.asyncio
+async def test_planning_excludes_food_pois_by_default(obs: Observability):
+    """Sightseeing plans must not schedule restaurants from mixed search/fallback catalogs."""
+    mixed = [
+        {
+            "osm_id": "node/1",
+            "name": "City Palace",
+            "lat": 26.9258,
+            "lon": 75.8236,
+            "category": "culture",
+            "source": "osm",
+        },
+        {
+            "osm_id": "well_known/jaipur-lmb",
+            "name": "Laxmi Misthan Bhandar (LMB)",
+            "lat": 26.9190,
+            "lon": 75.8265,
+            "category": "food",
+            "source": "well_known",
+        },
+        {
+            "osm_id": "node/2",
+            "name": "Amber Fort",
+            "lat": 26.9855,
+            "lon": 75.8513,
+            "category": "landmark",
+            "source": "osm",
+        },
+    ]
+
+    class MixedGateway(RecordingGateway):
+        async def _search_pois(self, **kwargs: Any) -> dict[str, Any]:
+            return {"source": "osm", "pois": list(mixed), "live_poi_lookup": True}
+
+    gateway = MixedGateway(observability=obs)
+    agent = PlanningAgent(llm=LLMAdapter(), gateway=gateway, observability=obs)
+
+    await agent.run(
+        _plan_task(constraints={"city": "Jaipur", "days": 3, "interests": [], "pace": "moderate"})
+    )
+
+    build_pois = gateway.calls[1][2]["pois"]
+    categories = {(p.get("category") or "").lower() for p in build_pois}
+    names = {str(p.get("name") or "") for p in build_pois}
+    assert "food" not in categories
+    assert "Laxmi Misthan Bhandar (LMB)" not in names
+    assert "City Palace" in names
+    assert "Amber Fort" in names
+
+
+@pytest.mark.asyncio
+async def test_planning_keeps_food_when_interest_requested(obs: Observability):
+    mixed = [
+        {
+            "osm_id": "node/1",
+            "name": "City Palace",
+            "lat": 26.9258,
+            "lon": 75.8236,
+            "category": "culture",
+            "source": "osm",
+        },
+        {
+            "osm_id": "well_known/jaipur-lmb",
+            "name": "Laxmi Misthan Bhandar (LMB)",
+            "lat": 26.9190,
+            "lon": 75.8265,
+            "category": "food",
+            "source": "well_known",
+        },
+    ]
+
+    class MixedGateway(RecordingGateway):
+        async def _search_pois(self, **kwargs: Any) -> dict[str, Any]:
+            return {"source": "osm", "pois": list(mixed), "live_poi_lookup": True}
+
+    gateway = MixedGateway(observability=obs)
+    agent = PlanningAgent(llm=LLMAdapter(), gateway=gateway, observability=obs)
+
+    await agent.run(_plan_task())  # interests include food + culture
+
+    build_pois = gateway.calls[1][2]["pois"]
+    names = {str(p.get("name") or "") for p in build_pois}
+    assert "Laxmi Misthan Bhandar (LMB)" in names
+
+
+def test_well_known_default_excludes_food():
+    from src.mcp_servers.poi_search.fallback import well_known_pois_for_city
+
+    sightseeing = well_known_pois_for_city("Jaipur", interests=[])
+    food = well_known_pois_for_city("Jaipur", interests=["food"])
+    assert all((p.get("category") or "").lower() != "food" for p in sightseeing)
+    assert any((p.get("category") or "").lower() == "food" for p in food)

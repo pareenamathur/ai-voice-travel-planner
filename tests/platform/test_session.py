@@ -192,6 +192,34 @@ def test_set_itinerary_approved_and_eval_report():
     assert updated.itinerary_approved is True
 
 
+def test_record_eval_report_persists_fail_without_approving():
+    """Phase 7 Task 3 — FAIL stores report + verdict; approval stays false."""
+    mgr = SessionManager()
+    session = mgr.create()
+    report = {
+        "entries": [
+            {
+                "name": "feasibility",
+                "passed": False,
+                "reasons": ["day 1 over budget"],
+            }
+        ]
+    }
+
+    mgr.record_eval_report(
+        session.session_id,
+        report,
+        verdict=ReviewStatus.FAIL,
+    )
+    mgr.set_itinerary_approved(session.session_id, False)
+
+    updated = mgr.read(session.session_id)
+    assert updated.last_eval_report == report
+    assert updated.last_review_verdict == ReviewStatus.FAIL.value
+    assert updated.itinerary_approved is False
+    assert updated.conversation_history == []
+
+
 def test_update_metadata_and_conversation_phase():
     mgr = SessionManager()
     session = mgr.create()

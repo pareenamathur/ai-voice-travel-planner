@@ -33,9 +33,7 @@ describe("SourcesPanel", () => {
     expect(within(cards[0]).getByTestId("citation-label")).toHaveTextContent(
       "Wikivoyage — Jaipur",
     );
-    expect(within(cards[0]).getByTestId("citation-source")).toHaveTextContent(
-      "wikivoyage",
-    );
+    expect(within(cards[0]).queryByTestId("citation-id")).not.toBeInTheDocument();
     expect(within(cards[0]).getByTestId("citation-section")).toHaveTextContent(
       "See",
     );
@@ -49,8 +47,8 @@ describe("SourcesPanel", () => {
     );
 
     expect(cards[2]).toHaveAttribute("data-citation-id", "osm:node/123");
-    expect(within(cards[2]).getByTestId("citation-source")).toHaveTextContent(
-      "osm",
+    expect(within(cards[2]).getByTestId("citation-label")).toHaveTextContent(
+      "OSM node/123",
     );
   });
 
@@ -80,15 +78,12 @@ describe("SourcesPanel", () => {
     render(<SourcesPanel itinerary={sparseCitationsItinerary} />);
 
     const card = screen.getByTestId("citation-card");
-    expect(within(card).getByTestId("citation-id")).toHaveTextContent(
-      "jaipur:wikivoyage#eat#0009",
-    );
-    // Source can still be derived from citation_id pattern.
-    expect(within(card).getByTestId("citation-source")).toHaveTextContent(
+    // Friendly label is derived; raw citation_id is not shown to users.
+    expect(within(card).getByTestId("citation-label")).toHaveTextContent(
       "wikivoyage",
     );
+    expect(within(card).queryByTestId("citation-id")).not.toBeInTheDocument();
     expect(within(card).queryByTestId("citation-section")).not.toBeInTheDocument();
-    expect(within(card).queryByTestId("citation-label")).not.toBeInTheDocument();
     expect(within(card).queryByTestId("citation-url")).not.toBeInTheDocument();
   });
 

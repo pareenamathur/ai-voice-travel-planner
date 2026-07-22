@@ -9,12 +9,12 @@ import {
 import "./evals.css";
 
 /**
- * Evaluation Status Panel — props-only display of Review-style eval reports.
- * Compatible with future Phase 7 ``EvalReport`` / ``last_eval_report`` payloads.
+ * Evaluation Status Panel — displays Review ``EvalReport`` / ``ReviewVerdict`` data.
  */
 export function EvalStatusPanel({
   report = null,
   title = "Evaluation status",
+  itineraryApproved = null,
 }: EvalStatusPanelProps) {
   const evaluations = collectEvaluations(report);
   const summary = buildSummary(evaluations, report);
@@ -22,6 +22,9 @@ export function EvalStatusPanel({
     summary.overallVerdict === "UNKNOWN"
       ? "unknown"
       : statusCssClass(summary.overallVerdict);
+  const regenAttempted = Boolean(report?.regen_attempted);
+  const showApprovalWarning =
+    evaluations.length > 0 && itineraryApproved === false;
 
   return (
     <section
@@ -39,6 +42,29 @@ export function EvalStatusPanel({
         </p>
       ) : (
         <>
+          {regenAttempted ? (
+            <p
+              className="eval-status-panel__regen"
+              data-testid="eval-regen-indicator"
+              role="status"
+            >
+              This itinerary was regenerated once by Review. The results below
+              are the final review outcome.
+            </p>
+          ) : null}
+
+          {showApprovalWarning ? (
+            <p
+              className="eval-status-panel__approval-warning"
+              data-testid="eval-approval-warning"
+              role="alert"
+            >
+              This itinerary did not pass all quality checks and is not approved.
+              You can still inspect the draft below; export and further edits stay
+              blocked until a passing review.
+            </p>
+          ) : null}
+
           <div
             className={`eval-summary eval-summary--${overallClass}`}
             data-testid="eval-summary"

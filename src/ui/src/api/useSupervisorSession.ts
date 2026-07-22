@@ -28,6 +28,10 @@ import { asItinerary, evalReportFromVerdict } from "./mapSession";
 
 import { spansToTraceItems } from "./mapTrace";
 
+import type { LoadingHint } from "./loadingHint";
+
+import { inferLoadingHint } from "./loadingHint";
+
 
 
 const SESSION_STORAGE_KEY = "vtp.session_id";
@@ -59,6 +63,10 @@ export interface SupervisorSessionState {
   confirmRejectedWarning: string | null;
 
   loading: boolean;
+
+  loadingHint: LoadingHint;
+
+  itineraryRevision: number;
 
   traceLoading: boolean;
 
@@ -136,6 +144,8 @@ function applySessionResponse(
 
     setEvalReport: (updater: (prev: EvalReportData | null) => EvalReportData | null) => void;
 
+    bumpItineraryRevision: () => void;
+
   },
 
 ): void {
@@ -161,6 +171,8 @@ function applySessionResponse(
   if (nextItinerary) {
 
     setters.setItinerary(() => nextItinerary);
+
+    setters.bumpItineraryRevision();
 
   }
 
@@ -210,6 +222,10 @@ export function useSupervisorSession(): SupervisorSessionState {
 
   const [loading, setLoading] = useState(false);
 
+  const [loadingHint, setLoadingHint] = useState<LoadingHint>("default");
+
+  const [itineraryRevision, setItineraryRevision] = useState(0);
+
   const [traceLoading, setTraceLoading] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
@@ -257,6 +273,8 @@ export function useSupervisorSession(): SupervisorSessionState {
 
 
       setLoading(true);
+
+      setLoadingHint(inferLoadingHint(trimmed));
 
       setError(null);
 
@@ -325,6 +343,8 @@ export function useSupervisorSession(): SupervisorSessionState {
           setItinerary,
 
           setEvalReport,
+
+          bumpItineraryRevision: () => setItineraryRevision((n) => n + 1),
 
         });
 
@@ -443,6 +463,10 @@ export function useSupervisorSession(): SupervisorSessionState {
     confirmRejectedWarning,
 
     loading,
+
+    loadingHint,
+
+    itineraryRevision,
 
     traceLoading,
 

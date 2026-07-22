@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../App";
+import { EvalStatusPanel, ItineraryView } from "../../components";
 import { useSupervisorSession } from "../useSupervisorSession";
 import type { SessionMessageResponse } from "../supervisorClient";
 
@@ -135,6 +136,32 @@ function SessionHarness() {
       <p data-testid="has-itinerary">{session.itinerary ? "yes" : "no"}</p>
       <p data-testid="has-eval">{session.evalReport ? "yes" : "no"}</p>
       <p data-testid="trace-count">{session.traceItems.length}</p>
+    </div>
+  );
+}
+
+/** Hook + eval/itinerary panels — verifies Phase 7 Task 4 presentation wiring. */
+function EvalPresentationHarness() {
+  const session = useSupervisorSession();
+  return (
+    <div>
+      <button
+        type="button"
+        data-testid="harness-submit"
+        onClick={() =>
+          session.submitTranscript("Plan 2 days in Jaipur").catch(() => {})
+        }
+      >
+        Submit
+      </button>
+      <p data-testid="has-itinerary">{session.itinerary ? "yes" : "no"}</p>
+      <p data-testid="has-eval">{session.evalReport ? "yes" : "no"}</p>
+      <p data-testid="approved">{String(session.itineraryApproved)}</p>
+      <ItineraryView itinerary={session.itinerary} />
+      <EvalStatusPanel
+        report={session.evalReport}
+        itineraryApproved={session.itineraryApproved}
+      />
     </div>
   );
 }
@@ -454,5 +481,56 @@ describe("useSupervisorSession integration", () => {
     expect(messages.some((line) => line.includes("Supervisor API → POST"))).toBe(true);
     expect(messages.some((line) => line.includes("Supervisor API ←"))).toBe(true);
     infoSpy.mockRestore();
+  });
+
+  it("maps FAIL review_verdict with regen into evalReport for the UI", async () => {
+    const user = userEvent.setup();
+    const failResponse: SessionMessageResponse = {
+      ...approvedResponse,
+      itinerary_approved: false,
+      response:
+        "Quality checks did not fully pass. One regeneration was already attempted.",
+      review_verdict: {
+        status: "fail",
+        regen_attempted: true,
+        eval_report: {
+          entries: [
+            {
+              name: "feasibility",
+              passed: false,
+              reasons: ["day 1 over budget"],
+            },
+            { name: "grounding", passed: true, reasons: [] },
+          ],
+        },
+      },
+    };
+
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = String(input);
+      if (url.includes("/api/session/message")) {
+        return jsonResponse(failResponse);
+      }
+      if (url.includes("/trace")) {
+        return jsonResponse({ session_id: "sess-abc", spans: [] });
+      }
+      return jsonResponse({}, 404);
+    });
+
+    render(<EvalPresentationHarness />);
+    await user.click(screen.getByTestId("harness-submit"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("has-itinerary")).toHaveTextContent("yes");
+      expect(screen.getByTestId("has-eval")).toHaveTextContent("yes");
+    });
+
+    expect(screen.getByTestId("approved")).toHaveTextContent("false");
+    expect(screen.getByTestId("eval-overall-verdict")).toHaveTextContent("Overall: FAIL");
+    expect(screen.getByTestId("eval-regen-indicator")).toHaveTextContent(/regenerated once/i);
+    expect(screen.getByTestId("eval-approval-warning")).toHaveTextContent(
+      /did not pass all quality checks/i,
+    );
+    expect(screen.getByTestId("itinerary-view")).toBeInTheDocument();
   });
 });

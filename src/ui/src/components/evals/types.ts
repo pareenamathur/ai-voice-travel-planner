@@ -58,6 +58,11 @@ export interface EvalReportData {
   entries?: EvalReportEntryLike[];
   timestamp?: string | null;
   metadata?: Record<string, unknown>;
+  /**
+   * From ``ReviewVerdict.regen_attempted``.
+   * True when Review already used its one regeneration budget.
+   */
+  regen_attempted?: boolean | null;
 }
 
 export interface EvalSummary {
@@ -71,4 +76,9 @@ export interface EvalSummary {
 export interface EvalStatusPanelProps {
   report?: EvalReportData | null;
   title?: string;
+  /**
+   * Session ``itinerary_approved`` flag.
+   * When false and a report exists, show a quality-check warning.
+   */
+  itineraryApproved?: boolean | null;
 }

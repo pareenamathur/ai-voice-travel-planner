@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from src.mcp_servers.poi_search.models import POI, osm_element_to_poi
-from src.mcp_servers.poi_search.overpass import OverpassClient
+from src.mcp_servers.poi_search.overpass import OverpassClient, OverpassError
 from src.mcp_servers.poi_search.queries import INTEREST_MAP, build_overpass_query
 
 DEFAULT_CITY_CACHE_TTL_SECONDS = 24 * 3600
@@ -42,7 +42,7 @@ class POISearchService:
         """
 
         interests = interests or []
-        city_key = _city_cache_key(city)
+        city_key = _city_cache_key(city, interests)
 
         if use_cache and self.city_cache_ttl_seconds > 0:
             cached = self._read_city_cache(city_key)
@@ -57,7 +57,15 @@ class POISearchService:
         query = build_overpass_query(city=city, interests=interests)
         # Query-hash cache remains useful within a process; city TTL cache reduces
         # repeated Overpass hits across interest variants during development.
-        payload = await self._overpass.run_query(query, use_cache=use_cache)
+        try:
+            payload = await self._overpass.run_query(query, use_cache=use_cache)
+        except OverpassError:
+            # True Overpass failure (timeouts, empty after all mirrors, HTTP errors).
+            return {
+                "source": "osm",
+                "pois": [],
+                "live_poi_lookup": False,
+            }
 
         elements = payload.get("elements") or []
         pois: list[POI] = []
@@ -127,9 +135,16 @@ class POISearchService:
         )
 
 
-def _city_cache_key(city: str) -> str:
+def _city_cache_key(city: str, interests: list[str] | None = None) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", (city or "").strip().lower()).strip("-")
-    return slug or "unknown"
+    city_part = slug or "unknown"
+    interests_norm = sorted(
+        {i.strip().lower() for i in (interests or []) if i and i.strip()}
+    )
+    if not interests_norm:
+        return f"{city_part}__sightseeing"
+    interest_part = "-".join(interests_norm)
+    return f"{city_part}__{interest_part}"
 
 
 def build_default_poi_service(
