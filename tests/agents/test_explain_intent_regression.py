@@ -20,6 +20,11 @@ _ADVISORY_QUESTIONS = [
     "What should I pack?",
     "Is this suitable during monsoon?",
     "Can I do this with elderly parents?",
+    "What if it rains?",
+    "Will it be crowded?",
+    "Is Day 2 feasible?",
+    "Can I finish before sunset?",
+    "Why Amber Fort?",
 ]
 
 
@@ -36,14 +41,14 @@ def test_advisory_questions_classify_as_explain_with_itinerary(message: str):
     assert intent == TaskType.EXPLAIN, message
 
 
-def test_advisory_explain_without_approval_still_explain():
+def test_advisory_explain_with_approval_only_flag():
     intent = classify_intent(
         message="Is this plan doable?",
         constraints=_DEFAULT_CONSTRAINTS,
         phase=ConversationPhase.ACTIVE,
         has_sufficient=True,
-        has_itinerary=True,
-        itinerary_approved=False,
+        has_itinerary=False,
+        itinerary_approved=True,
     )
     assert intent == TaskType.EXPLAIN
 

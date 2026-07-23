@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from src.agents.base import BaseAgent
-from src.agents.supervisor.intent import classify_intent, is_greeting
+from src.agents.supervisor.intent import classify_intent, is_greeting, is_new_trip_request
 from src.agents.supervisor.recommend import recommend_search_interests
 from src.agents.supervisor.slots import (
     clarification_question,
@@ -97,6 +97,13 @@ class SupervisorAgent(BaseAgent):
 
         # Always re-read after writes — never cache mutable session state locally.
         session = self.sessions.read(sid)
+
+        if is_new_trip_request(message) and (
+            session.itinerary_approved or bool(session.itinerary)
+        ):
+            self.sessions.reset_trip_plan(sid)
+            session = self.sessions.read(sid)
+
         extracted = extract_slots(message)
         self._trace(
             "slot_extraction",
@@ -112,12 +119,13 @@ class SupervisorAgent(BaseAgent):
 
         constraints = session.trip_constraints
         sufficient = has_sufficient_constraints(constraints)
+        has_itinerary = bool(session.itinerary)
         intent = classify_intent(
             message=message,
             constraints=constraints,
             phase=session.conversation_phase,
             has_sufficient=sufficient,
-            has_itinerary=session.itinerary is not None,
+            has_itinerary=has_itinerary,
             itinerary_approved=session.itinerary_approved,
         )
         self._trace(

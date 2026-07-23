@@ -5,11 +5,14 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import time
 from pathlib import Path
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 # Identify this app to the public Overpass front-end (avoids Apache 406 on generic clients).
 DEFAULT_USER_AGENT = (
@@ -101,6 +104,12 @@ class OverpassClient:
                         resp = await c.post(mirror_url, data={"data": query}, headers=headers)
                     except (httpx.TimeoutException, httpx.TransportError) as exc:
                         last_error = OverpassError(f"Overpass transport error: {exc}")
+                        logger.warning(
+                            "overpass_transport_error mirror=%s attempt=%s error=%s",
+                            mirror_url,
+                            attempt + 1,
+                            exc,
+                        )
                         if attempt < self.max_attempts_per_mirror - 1:
                             delay = self.backoff_base_seconds * (2**attempt)
                             await asyncio.sleep(delay)
@@ -110,16 +119,36 @@ class OverpassClient:
                     if resp.status_code == 200:
                         payload = resp.json()
                         if _has_overpass_elements(payload):
+                            duration_ms = round((time.perf_counter() - started) * 1000, 2)
+                            logger.info(
+                                "overpass_success mirror=%s attempt=%s elements=%s duration_ms=%s",
+                                mirror_url,
+                                attempt + 1,
+                                len(payload.get("elements") or []),
+                                duration_ms,
+                            )
                             cache_path.write_text(json.dumps(payload), encoding="utf-8")
                             return payload
                         # Empty success — try next mirror instead of caching poison.
                         last_error = OverpassError(
                             "Overpass returned HTTP 200 with empty elements"
                         )
+                        logger.warning(
+                            "overpass_empty_elements mirror=%s attempt=%s duration_ms=%s",
+                            mirror_url,
+                            attempt + 1,
+                            round((time.perf_counter() - started) * 1000, 2),
+                        )
                         break
 
                     detail = f"Overpass HTTP {resp.status_code}: {resp.text[:200]}"
                     last_error = OverpassError(detail)
+                    logger.warning(
+                        "overpass_http_error mirror=%s status=%s attempt=%s",
+                        mirror_url,
+                        resp.status_code,
+                        attempt + 1,
+                    )
 
                     if (
                         resp.status_code in self.retryable_statuses
@@ -132,6 +161,12 @@ class OverpassClient:
                     break
 
         assert last_error is not None
+        logger.error(
+            "overpass_all_mirrors_failed mirrors=%s duration_ms=%s last_error=%s",
+            len(self.base_urls),
+            round((time.perf_counter() - started) * 1000, 2),
+            last_error,
+        )
         raise last_error
 
 

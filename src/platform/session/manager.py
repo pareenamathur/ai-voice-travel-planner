@@ -224,6 +224,20 @@ class SessionManager:
         session.metadata.update(metadata)
         return self.save(session)
 
+    def reset_trip_plan(self, session_id: str) -> SessionData:
+        """Clear itinerary artifacts so a new trip can be planned."""
+        session = self._require(session_id)
+        session.itinerary = None
+        session.itinerary_approved = False
+        session.poi_registry = {}
+        session.rag_citations = []
+        session.last_eval_report = None
+        session.last_review_verdict = None
+        session.conversation_phase = ConversationPhase.INTAKE
+        session.clarifying_questions_asked = 0
+        session.metadata.pop("pending_task", None)
+        return self.save(session)
+
     def _require(self, session_id: str) -> SessionData:
         session = self.get(session_id)
         if session is None:

@@ -32,7 +32,7 @@ def osm_element_to_poi(element: dict[str, Any], *, category: str | None = None) 
         return None
 
     tags = element.get("tags") or {}
-    name = tags.get("name")
+    name = tags.get("name") or tags.get("name:en") or tags.get("alt_name")
     if not name:
         return None
 

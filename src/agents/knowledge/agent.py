@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from typing import Any
 
 from src.agents.base import BaseAgent
@@ -112,6 +113,7 @@ class KnowledgeAgent(BaseAgent):
         assert self.gateway is not None
         query = _build_retrieval_query(question, task.payload)
         self._trace("retrieve_guidance", correlation_id, city=city, query_preview=query[:120])
+        rag_started = time.perf_counter()
         guidance = await self.gateway.invoke(
             AgentRole.KNOWLEDGE,
             "retrieve_guidance",
@@ -122,6 +124,11 @@ class KnowledgeAgent(BaseAgent):
                 "session_id": task.session_id,
             },
             correlation_id=correlation_id,
+        )
+        self._trace(
+            "rag_retrieval_stage",
+            correlation_id,
+            duration_ms=round((time.perf_counter() - rag_started) * 1000, 2),
         )
         if not isinstance(guidance, dict):
             raise ValueError("retrieve_guidance must return a dict payload")

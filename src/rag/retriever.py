@@ -18,6 +18,20 @@ from src.rag.embeddings import (
 from src.rag.models import Chunk, RetrievalQuery, RetrievedChunk
 from src.rag.vector_store import ChromaVectorStore, VectorStore
 
+_default_retriever: SemanticRetriever | None = None
+
+
+def _get_default_retriever() -> SemanticRetriever:
+    global _default_retriever
+    if _default_retriever is None:
+        _default_retriever = SemanticRetriever(
+            vector_store=ChromaVectorStore(),
+            embeddings_provider=EmbeddingsProviderFactory.create(
+                EmbeddingsConfig.from_settings()
+            ),
+        )
+    return _default_retriever
+
 
 @dataclass(frozen=True, slots=True)
 class RetrieverConfig:
@@ -158,10 +172,12 @@ async def retrieve(
     config: RetrieverConfig | None = None,
 ) -> list[RetrievedChunk]:
     """Retrieve top-k chunks for a query scoped to a city."""
-    retriever = SemanticRetriever(
-        vector_store=vector_store or ChromaVectorStore(),
-        embeddings_provider=embeddings_provider
-        or EmbeddingsProviderFactory.create(EmbeddingsConfig.from_settings()),
-        config=config,
-    )
-    return await retriever.retrieve_query(query=query, city=city, top_k=top_k)
+    if vector_store is not None or embeddings_provider is not None or config is not None:
+        retriever = SemanticRetriever(
+            vector_store=vector_store or ChromaVectorStore(),
+            embeddings_provider=embeddings_provider
+            or EmbeddingsProviderFactory.create(EmbeddingsConfig.from_settings()),
+            config=config,
+        )
+        return await retriever.retrieve_query(query=query, city=city, top_k=top_k)
+    return await _get_default_retriever().retrieve_query(query=query, city=city, top_k=top_k)

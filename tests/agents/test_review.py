@@ -380,6 +380,7 @@ async def test_observability_spans_on_pass(review: ReviewAgent, obs: Observabili
     assert events == [
         "review_started",
         "artifact_validated",
+        "review_eval_stage",
         "eval_completed",
         "review_completed",
     ]

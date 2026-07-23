@@ -40,6 +40,14 @@ INTEREST_MAP: dict[str, InterestQuery] = {
             'nwr["tourism"="viewpoint"](area.searchArea);',
         ],
     ),
+    "sightseeing": InterestQuery(
+        category="landmark",
+        clauses=[
+            'nwr["tourism"="attraction"](area.searchArea);',
+            'nwr["historic"](area.searchArea);',
+            'nwr["tourism"="viewpoint"](area.searchArea);',
+        ],
+    ),
     # Shopping / markets (useful for Jaipur)
     "shopping": InterestQuery(
         category="shopping",
