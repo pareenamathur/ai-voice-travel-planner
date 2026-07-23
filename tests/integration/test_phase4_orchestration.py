@@ -182,7 +182,8 @@ async def test_full_supervisor_planning_review_flow(
     assert result["itinerary_approved"] is True
     assert result["review_verdict"]["status"] == ReviewStatus.PASS.value
     assert result["task_message"]["task_type"] == TaskType.PLAN.value
-    assert "approved by Review" in result["response"]
+    assert "approved by Review" not in result["response"]
+    assert "is ready" in result["response"].lower()
     assert result["itinerary"] is not None
     assert "City Palace" in str(result["itinerary"])
 
@@ -301,8 +302,8 @@ async def test_review_fail_after_regen_returns_best_available(
     assert result["intent"] == TaskType.PLAN.value
     assert result["itinerary_approved"] is False
     assert result["itinerary"] == best_draft
-    assert "quality checks did not fully pass" in result["response"].lower()
-    assert "one regeneration was already attempted" in result["response"].lower()
+    assert "couldn't finalize" in result["response"].lower()
+    assert "automatic revision" in result["response"].lower()
     assert "feasibility" in result["response"].lower()
     assert result["review_verdict"]["status"] == ReviewStatus.FAIL.value
     assert result["review_verdict"]["regen_attempted"] is True
@@ -324,6 +325,7 @@ async def test_review_fail_after_regen_returns_best_available(
 @pytest.mark.asyncio
 async def test_planning_never_returns_directly_to_user(registry: AgentRegistry):
     result = await _confirm_then_plan(registry.supervisor, correlation_id="corr-gate")
-    assert "approved by Review" in result["response"]
+    assert "approved by Review" not in result["response"]
+    assert "is ready" in result["response"].lower()
     assert result["review_verdict"] is not None
     assert "plan_artifact" not in result

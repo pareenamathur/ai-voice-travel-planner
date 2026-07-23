@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +21,8 @@ DEFAULT_REFERER = "https://github.com/pareenamathur/ai-voice-travel-planner"
 # Retry transient Overpass / gateway failures with exponential backoff per mirror.
 RETRYABLE_STATUS_CODES = frozenset({429, 502, 503, 504})
 MAX_ATTEMPTS_PER_MIRROR = 3
-BACKOFF_BASE_SECONDS = 1.0
+BACKOFF_BASE_SECONDS = 0.75
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 25.0
 
 # Back-compat aliases for older imports/tests.
 MAX_504_RETRIES = MAX_ATTEMPTS_PER_MIRROR - 1
@@ -43,6 +45,7 @@ class OverpassClient:
         backoff_base_seconds: float = BACKOFF_BASE_SECONDS,
         max_attempts_per_mirror: int = MAX_ATTEMPTS_PER_MIRROR,
         retryable_statuses: frozenset[int] | set[int] = RETRYABLE_STATUS_CODES,
+        request_timeout_seconds: float = DEFAULT_REQUEST_TIMEOUT_SECONDS,
     ) -> None:
         urls = [u.strip() for u in (base_urls or []) if u and u.strip()]
         if not urls and base_url:
@@ -59,6 +62,7 @@ class OverpassClient:
         self.backoff_base_seconds = backoff_base_seconds
         self.max_attempts_per_mirror = max(1, int(max_attempts_per_mirror))
         self.retryable_statuses = frozenset(retryable_statuses)
+        self.request_timeout_seconds = request_timeout_seconds
 
     def _request_headers(self) -> dict[str, str]:
         return {
@@ -71,6 +75,7 @@ class OverpassClient:
         return self.cache_dir / f"overpass-{digest}.json"
 
     async def run_query(self, query: str, *, use_cache: bool = True) -> dict[str, Any]:
+        started = time.perf_counter()
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         cache_path = self._cache_path(query)
 
@@ -83,8 +88,9 @@ class OverpassClient:
 
         headers = self._request_headers()
         last_error: OverpassError | None = None
+        timeout = httpx.Timeout(self.request_timeout_seconds)
 
-        async with httpx.AsyncClient(timeout=30.0) if self._client is None else _null_async_cm(
+        async with httpx.AsyncClient(timeout=timeout) if self._client is None else _null_async_cm(
             self._client
         ) as client:
             c = client if self._client is None else self._client

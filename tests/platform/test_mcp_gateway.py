@@ -39,6 +39,9 @@ async def test_gateway_emits_observability_spans():
     events = [s.get("event") for s in spans]
     assert "tool_call_start" in events
     assert "tool_call_complete" in events
+    complete = next(s for s in spans if s.get("event") == "tool_call_complete")
+    assert "duration_ms" in complete
+    assert complete["duration_ms"] >= 0
 
 
 def test_gateway_is_permitted():

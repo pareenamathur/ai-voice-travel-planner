@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import base64
+import time
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from src.agents.base import BaseAgent
-from src.agents.planning.agent import LIVE_POI_UNAVAILABLE_NOTE
 from src.agents.supervisor.intent import classify_intent, is_greeting
 from src.agents.supervisor.recommend import recommend_search_interests
 from src.agents.supervisor.slots import (
@@ -82,6 +82,7 @@ class SupervisorAgent(BaseAgent):
         correlation_id: str | None = None,
     ) -> dict[str, Any]:
         corr_id = self._resolve_correlation_id(correlation_id)
+        turn_started = time.perf_counter()
         session = self.sessions.get_or_create(session_id)
         sid = session.session_id
 
@@ -134,19 +135,47 @@ class SupervisorAgent(BaseAgent):
         itinerary: dict[str, Any] | None = None
 
         if intent == TaskType.PLAN:
+            plan_started = time.perf_counter()
             response_text, task_message, review_verdict, itinerary = await self._handle_plan(
                 sid, corr_id
             )
+            self._trace(
+                "supervisor_plan_flow",
+                corr_id,
+                session_id=sid,
+                duration_ms=round((time.perf_counter() - plan_started) * 1000, 2),
+            )
         elif intent == TaskType.EDIT:
+            edit_started = time.perf_counter()
             response_text, task_message, review_verdict, itinerary = await self._handle_edit(
                 sid, corr_id, message
             )
+            self._trace(
+                "supervisor_edit_flow",
+                corr_id,
+                session_id=sid,
+                duration_ms=round((time.perf_counter() - edit_started) * 1000, 2),
+            )
         elif intent == TaskType.EXPLAIN:
+            explain_started = time.perf_counter()
             response_text, task_message = await self._handle_explain(sid, corr_id, message)
             review_verdict = None
+            self._trace(
+                "supervisor_explain_flow",
+                corr_id,
+                session_id=sid,
+                duration_ms=round((time.perf_counter() - explain_started) * 1000, 2),
+            )
         elif intent == TaskType.RECOMMEND:
+            recommend_started = time.perf_counter()
             response_text, task_message = await self._handle_recommend(sid, corr_id, message)
             review_verdict = None
+            self._trace(
+                "supervisor_recommend_flow",
+                corr_id,
+                session_id=sid,
+                duration_ms=round((time.perf_counter() - recommend_started) * 1000, 2),
+            )
         elif intent == TaskType.CONFIRM:
             response_text = self._handle_confirm(sid, corr_id)
         else:
@@ -169,6 +198,13 @@ class SupervisorAgent(BaseAgent):
             itinerary_approved=session.itinerary_approved,
         )
         self._trace("user_response_sent", corr_id, session_id=sid, intent=intent.value)
+        self._trace(
+            "handle_message_complete",
+            corr_id,
+            session_id=sid,
+            intent=intent.value,
+            duration_ms=round((time.perf_counter() - turn_started) * 1000, 2),
+        )
 
         result: dict[str, Any] = {
             "session_id": sid,
@@ -292,6 +328,7 @@ class SupervisorAgent(BaseAgent):
             poi_count=len(artifact.poi_registry),
         )
 
+        review_started = time.perf_counter()
         verdict: ReviewVerdict = await self.review.run(artifact)
         self._trace(
             "review_completed",
@@ -299,6 +336,7 @@ class SupervisorAgent(BaseAgent):
             session_id=session_id,
             status=verdict.status.value,
             regen_attempted=verdict.regen_attempted,
+            duration_ms=round((time.perf_counter() - review_started) * 1000, 2),
         )
 
         if verdict.status in APPROVED_STATUSES:
@@ -399,7 +437,17 @@ class SupervisorAgent(BaseAgent):
         )
 
         artifact: EditArtifact = await self.edit.run(task)
+        review_started = time.perf_counter()
         verdict: ReviewVerdict = await self.review.review_edit(artifact)
+        self._trace(
+            "review_completed",
+            corr_id,
+            session_id=session_id,
+            status=verdict.status.value,
+            regen_attempted=verdict.regen_attempted,
+            duration_ms=round((time.perf_counter() - review_started) * 1000, 2),
+            artifact_type="edit",
+        )
 
         if verdict.status in APPROVED_STATUSES:
             itinerary = dict(verdict.final_artifact or artifact.itinerary or {})
@@ -614,7 +662,7 @@ class SupervisorAgent(BaseAgent):
 def _format_edit_response(itinerary: dict[str, Any], scope: Any) -> str:
     day_number = getattr(scope, "day", None) or "?"
     lines = [
-        "Your itinerary has been updated (approved by Review).",
+        "Your itinerary has been updated.",
         f"Day {day_number} is refreshed in the trip panel — check the timeline on the right "
         "for stops, travel times, and durations.",
     ]
@@ -645,38 +693,34 @@ def _format_failed_review_response(
     subject: str,
     previous_preserved: bool = False,
 ) -> str:
-    """Explain FAIL to the user; Supervisor never issues a second regeneration."""
+    """Explain quality issues to the user without internal agent names."""
     lines = [
-        f"Quality checks did not fully pass for this {subject} "
-        f"(review status: {verdict.status.value}).",
+        f"I couldn't finalize this {subject} after checking pace, routing, and place details.",
     ]
     if verdict.regen_attempted:
-        lines.append(
-            "One regeneration was already attempted by Review; "
-            "no further regeneration will be tried."
-        )
+        lines.append("I tried one automatic revision, but it still needs your input.")
     else:
-        lines.append("The draft could not be approved as-is.")
+        lines.append("The draft needs a few adjustments before it's ready.")
 
     failed = [entry for entry in verdict.eval_report.entries if not entry.passed]
     if failed:
         lines.append("")
-        lines.append("Failed checks:")
+        lines.append("What to try:")
         for entry in failed:
-            detail = "; ".join(entry.reasons) if entry.reasons else "failed"
-            lines.append(f"- {entry.name}: {detail}")
+            detail = "; ".join(entry.reasons) if entry.reasons else "needs adjustment"
+            lines.append(f"- {entry.name.replace('_', ' ')}: {detail}")
 
     if previous_preserved:
         lines.append("")
-        lines.append("Your previous itinerary is unchanged and is no longer marked approved.")
+        lines.append("Your previous itinerary is unchanged.")
     elif itinerary:
         lines.append("")
         lines.append(
-            "A draft is available in the trip panel (not approved — export and edits stay blocked)."
+            "A draft is in the trip panel — export and edits stay paused until it's ready."
         )
 
     lines.append("")
-    lines.append("You can adjust your request and try planning again.")
+    lines.append("You can adjust your request and try again.")
     return "\n".join(lines)
 
 
@@ -684,16 +728,15 @@ def _format_approved_itinerary_response(itinerary: dict[str, Any], constraints: 
     city = itinerary.get("city") or getattr(constraints, "city", None) or "your destination"
     total_days = itinerary.get("total_days") or getattr(constraints, "days", None) or "?"
     lines = [
-        f"Your {total_days}-day itinerary for {_title(str(city))} is ready "
-        "(approved by Review). Open the trip panel for the full day-by-day timeline "
+        f"Your {total_days}-day itinerary for {_title(str(city))} is ready. "
+        "Open the trip panel for the full day-by-day timeline "
         "with travel times and visit durations.",
     ]
 
     metadata = itinerary.get("metadata") or {}
-    if metadata.get("live_poi_lookup") is False:
-        note = metadata.get("user_note") or LIVE_POI_UNAVAILABLE_NOTE
+    if metadata.get("live_poi_lookup") is False and metadata.get("user_note"):
         lines.append("")
-        lines.append(str(note))
+        lines.append(str(metadata["user_note"]))
 
     sources = _format_sources_blurb(itinerary)
     if sources:
