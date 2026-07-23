@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from src.rag.models import RetrievedChunk
@@ -91,6 +92,7 @@ async def retrieve_guidance(
             return bucket[cache_key]
 
     city_key = normalized_city.lower()
+    rag_started = time.perf_counter()
     if retriever is not None:
         results = await retriever.retrieve_query(
             query=normalized_query,
@@ -99,6 +101,7 @@ async def retrieve_guidance(
         )
     else:
         results = await retrieve(normalized_query, city_key, top_k=top_k)
+    rag_duration_ms = round((time.perf_counter() - rag_started) * 1000, 2)
 
     chunks = [_chunk_to_payload(item) for item in results]
     citations = [_chunk_to_citation(item) for item in results]
@@ -106,6 +109,7 @@ async def retrieve_guidance(
         "source": "rag",
         "chunks": chunks,
         "citations": citations,
+        "duration_ms": rag_duration_ms,
     }
     if session_id:
         _SESSION_RAG_CACHE.setdefault(session_id, {})[cache_key] = payload

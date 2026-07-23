@@ -50,12 +50,25 @@ _ITINERARY_ADVISORY_RE = re.compile(
     r"senior\s+citizen|elderly|older\s+parents?|wheelchair|accessible|accessibility|"
     r"\bsafe(?:ty)?\b|solo\s+travell?er|scam|"
     r"monsoon|during\s+summer|in\s+summer|summer\s+heat|"
+    r"rain|rains|raining|wet\s+day|what\s+if\s+it\s+rains|"
+    r"crowded|crowds?|too\s+crowded|"
+    r"before\s+sunset|finish\s+before|cover\s+everything|finish\s+everything|"
     r"pack(?:ing)?|what\s+should\s+i\s+(?:carry|bring|wear)|"
     r"expensive|budget[- ]?friendly|cost(?:ly)?|"
     r"public\s+transport|need\s+a\s+taxi|"
     r"suitable\s+for|suitable\s+during|"
     r"parents|"
-    r"can\s+i\s+do\s+this"
+    r"can\s+i\s+do\s+this|can\s+seniors|"
+    r"day\s*\d+\s+feasible|feasible\s+for\s+day"
+    r")\b",
+    re.IGNORECASE,
+)
+
+_NEW_TRIP_RE = re.compile(
+    r"\b("
+    r"new\s+trip|another\s+trip|different\s+trip|start\s+over|plan\s+again|"
+    r"plan\s+(?:a\s+)?(?:new\s+)?\d{1,2}[\s-]*day|"
+    r"plan\s+(?:a\s+)?trip\s+to"
     r")\b",
     re.IGNORECASE,
 )
@@ -134,6 +147,16 @@ def is_explicit_confirmation(message: str) -> bool:
     return bool(CONFIRM_RE.match(text))
 
 
+def is_new_trip_request(message: str) -> bool:
+    """Explicit request to start a fresh trip (re-enters planning intake)."""
+    text = (message or "").strip()
+    if not text:
+        return False
+    if is_itinerary_advisory_message(text) or is_explicit_confirmation(text):
+        return False
+    return bool(_NEW_TRIP_RE.search(text))
+
+
 def is_itinerary_advisory_message(message: str) -> bool:
     """Feasibility, suitability, safety, weather, logistics — not slot confirmation."""
     text = (message or "").strip()
@@ -167,6 +190,10 @@ def _has_destination_context(*, constraints: TripConstraints, has_itinerary: boo
     return has_itinerary or bool(constraints.city)
 
 
+def _has_active_itinerary(*, has_itinerary: bool, itinerary_approved: bool) -> bool:
+    return has_itinerary or itinerary_approved
+
+
 def classify_intent(
     *,
     message: str,
@@ -176,21 +203,38 @@ def classify_intent(
     has_itinerary: bool = False,
     itinerary_approved: bool = False,
 ) -> TaskType:
-    """Classify user intent: EDIT → RECOMMEND → EXPLAIN → PLAN → CONFIRM → CLARIFY."""
+    """Classify user intent: EDIT → NEW_TRIP → RECOMMEND → EXPLAIN → PLAN → CONFIRM → CLARIFY."""
+    active_itinerary = _has_active_itinerary(
+        has_itinerary=has_itinerary,
+        itinerary_approved=itinerary_approved,
+    )
+
     if itinerary_approved and is_edit_message(message):
         return TaskType.EDIT
+
+    if active_itinerary and is_new_trip_request(message):
+        return TaskType.CLARIFY
+
+    if active_itinerary and (
+        is_explain_message(message)
+        or is_itinerary_advisory_message(message)
+        or ((message or "").strip().endswith("?") and not is_explicit_confirmation(message))
+    ):
+        return TaskType.EXPLAIN
 
     if _has_destination_context(constraints=constraints, has_itinerary=has_itinerary):
         if is_recommend_message(message):
             return TaskType.RECOMMEND
 
-    if has_itinerary and is_explain_message(message):
-        return TaskType.EXPLAIN
-
-    if is_explicit_confirmation(message) and phase == ConversationPhase.CONFIRM and has_sufficient:
+    if (
+        is_explicit_confirmation(message)
+        and phase == ConversationPhase.CONFIRM
+        and has_sufficient
+        and not (itinerary_approved and has_itinerary)
+    ):
         return TaskType.PLAN
 
-    if has_sufficient:
+    if has_sufficient and not (itinerary_approved and has_itinerary):
         if has_itinerary and not is_explicit_confirmation(message):
             stripped = (message or "").strip()
             if stripped.endswith("?") or is_itinerary_advisory_message(message):

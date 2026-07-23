@@ -112,6 +112,20 @@ class RecordingGateway(MCPGateway):
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self.register("search_pois", self._search_pois)
         self.register("build_itinerary", self._build_itinerary)
+        self.register("retrieve_guidance", self._retrieve_guidance)
+
+    async def _retrieve_guidance(self, **kwargs: Any) -> dict[str, Any]:
+        return {
+            "source": "rag",
+            "chunks": [
+                {
+                    "chunk_id": "jaipur:see:1",
+                    "text": "Amber Fort is best visited in the morning.",
+                    "section": "See",
+                }
+            ],
+            "citations": [],
+        }
 
     async def invoke(self, role, tool_name, params, correlation_id=""):  # type: ignore[no-untyped-def]
         self.calls.append((tool_name, params))

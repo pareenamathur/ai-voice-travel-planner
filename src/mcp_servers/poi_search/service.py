@@ -13,7 +13,7 @@ from src.mcp_servers.poi_search.overpass import OverpassClient, OverpassError
 from src.mcp_servers.poi_search.queries import INTEREST_MAP, build_overpass_query
 
 DEFAULT_CITY_CACHE_TTL_SECONDS = 24 * 3600
-_MIN_WELL_KNOWN_FALLBACK_POIS = 4
+_MIN_POIS_TO_SKIP_BROADER_SEARCH = 6
 
 
 class POISearchService:
@@ -27,6 +27,8 @@ class POISearchService:
         self.city_cache_ttl_seconds = max(0, int(city_cache_ttl_seconds))
         # In-process session cache: one successful live lookup per (session, city).
         self._session_city_cache: dict[str, dict[str, Any]] = {}
+        # When every mirror fails for a session+city, skip duplicate Overpass calls.
+        self._session_overpass_exhausted: set[str] = set()
 
     async def search_pois(
         self,
@@ -76,18 +78,26 @@ class POISearchService:
             interests=interests,
             max_results=max_results,
             use_cache=use_cache,
+            session_key=session_key,
         )
         if result.get("live_poi_lookup") and result.get("pois"):
             self._remember_session(session_key, result)
             return result
 
-        # Broader Overpass query (default sightseeing) before declaring live lookup failed.
-        if interests:
+        pois = list(result.get("pois") or [])
+        exhausted = session_key and session_key in self._session_overpass_exhausted
+        needs_broader = (
+            interests
+            and len(pois) < _MIN_POIS_TO_SKIP_BROADER_SEARCH
+            and not exhausted
+        )
+        if needs_broader:
             broader = await self._live_search(
                 city=city,
                 interests=["sightseeing"],
                 max_results=max_results,
                 use_cache=use_cache,
+                session_key=session_key,
             )
             if broader.get("live_poi_lookup") and broader.get("pois"):
                 self._remember_session(session_key, broader)
@@ -102,15 +112,21 @@ class POISearchService:
         interests: list[str],
         max_results: int,
         use_cache: bool,
+        session_key: str | None = None,
     ) -> dict[str, Any]:
         query = build_overpass_query(city=city, interests=interests)
+        started = time.perf_counter()
         try:
             payload = await self._overpass.run_query(query, use_cache=use_cache)
-        except OverpassError:
+        except OverpassError as exc:
+            if session_key:
+                self._session_overpass_exhausted.add(session_key)
             return {
                 "source": "osm",
                 "pois": [],
                 "live_poi_lookup": False,
+                "error": str(exc)[:300],
+                "duration_ms": round((time.perf_counter() - started) * 1000, 2),
             }
 
         elements = payload.get("elements") or []
@@ -143,6 +159,8 @@ class POISearchService:
             "source": "osm",
             "pois": poi_dicts,
             "live_poi_lookup": live,
+            "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+            "element_count": len(elements),
         }
 
         if live and use_cache and self.city_cache_ttl_seconds > 0:

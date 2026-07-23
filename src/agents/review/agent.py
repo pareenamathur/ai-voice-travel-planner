@@ -8,6 +8,7 @@ Never user-facing; never calls MCP tools.
 
 from __future__ import annotations
 
+import time
 from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
@@ -83,7 +84,14 @@ class ReviewAgent(BaseAgent):
             has_itinerary=bool(plan.itinerary),
         )
 
+        eval_started = time.perf_counter()
         report = self._evaluate_plan(plan)
+        self._trace(
+            "review_eval_stage",
+            plan.correlation_id,
+            artifact_type="plan",
+            duration_ms=round((time.perf_counter() - eval_started) * 1000, 2),
+        )
         self._emit_eval_completed(plan.correlation_id, report, artifact_type="plan", attempt=0)
 
         if report.all_passed:

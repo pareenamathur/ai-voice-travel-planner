@@ -169,19 +169,32 @@ class PlanningAgent(BaseAgent):
         if not isinstance(pois, list):
             raise ValueError("search_pois.pois must be a list")
 
+        source = str(result.get("source") or "osm")
         live = bool(result.get("live_poi_lookup", bool(pois)))
+        if pois and source in ("osm", "city_cache"):
+            live = True
         if live and pois:
-            return pois, True, str(result.get("source") or "osm")
+            self._trace(
+                "poi_search_complete",
+                correlation_id,
+                poi_count=len(pois),
+                source=source,
+                live_poi_lookup=True,
+                duration_ms=result.get("duration_ms"),
+            )
+            return pois, True, source
 
         self._trace(
             "poi_lookup_degraded",
             correlation_id,
-            reason="empty_elements",
+            reason="empty_or_failed_live_search",
             city=constraints.city,
+            duration_ms=result.get("duration_ms"),
+            error=result.get("error"),
         )
         fallback = await self._fallback_pois(constraints, correlation_id)
-        source = fallback[0].get("source", "well_known") if fallback else "well_known"
-        return fallback, False, str(source)
+        fallback_source = fallback[0].get("source", "well_known") if fallback else "well_known"
+        return fallback, False, str(fallback_source)
 
     async def _search_pois(
         self,
@@ -191,6 +204,7 @@ class PlanningAgent(BaseAgent):
     ) -> dict[str, Any]:
         assert self.gateway is not None
         self._trace("search_pois", correlation_id, city=constraints.city)
+        poi_started = time.perf_counter()
         result = await self.gateway.invoke(
             AgentRole.PLANNING,
             "search_pois",
@@ -200,6 +214,11 @@ class PlanningAgent(BaseAgent):
                 "session_id": session_id,
             },
             correlation_id=correlation_id,
+        )
+        self._trace(
+            "poi_search_stage",
+            correlation_id,
+            duration_ms=round((time.perf_counter() - poi_started) * 1000, 2),
         )
         if not isinstance(result, dict):
             raise ValueError("search_pois must return a dict payload")
@@ -314,11 +333,17 @@ class PlanningAgent(BaseAgent):
             total_days=constraints.days,
             poi_count=len(pois),
         )
+        build_started = time.perf_counter()
         result = await self.gateway.invoke(
             AgentRole.PLANNING,
             "build_itinerary",
             params,
             correlation_id=correlation_id,
+        )
+        self._trace(
+            "itinerary_builder_stage",
+            correlation_id,
+            duration_ms=round((time.perf_counter() - build_started) * 1000, 2),
         )
         if not isinstance(result, dict):
             raise ValueError("build_itinerary must return a dict payload")
