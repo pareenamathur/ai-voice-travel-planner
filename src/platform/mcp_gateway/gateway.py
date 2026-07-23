@@ -1,5 +1,6 @@
 """MCP Gateway — Tool Registry with per-agent permissions."""
 
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -69,15 +70,15 @@ class MCPGateway:
         if not self.is_permitted(role, tool_name):
             raise PermissionDeniedError(role, tool_name)
 
-        start_event = {
-            "agent": "mcp_gateway",
-            "event": "tool_call_start",
-            "tool": tool_name,
-            "role": role.value,
-            "correlation_id": correlation_id,
-        }
+        started = time.perf_counter()
         if self._observability:
-            self._observability.record_span(**start_event)
+            self._observability.record_span(
+                agent="mcp_gateway",
+                event="tool_call_start",
+                tool=tool_name,
+                role=role.value,
+                correlation_id=correlation_id,
+            )
 
         try:
             result = await self._handlers[tool_name](**params)
@@ -90,6 +91,7 @@ class MCPGateway:
                     role=role.value,
                     correlation_id=correlation_id,
                     error=str(exc),
+                    duration_ms=round((time.perf_counter() - started) * 1000, 2),
                 )
             raise
 
@@ -100,6 +102,7 @@ class MCPGateway:
                 tool=tool_name,
                 role=role.value,
                 correlation_id=correlation_id,
+                duration_ms=round((time.perf_counter() - started) * 1000, 2),
             )
         return result
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from src.agents.base import BaseAgent
@@ -45,8 +46,16 @@ class PlanningAgent(BaseAgent):
             days=constraints.days,
         )
 
-        pois, live_poi_lookup, search_source = await self._resolve_pois(constraints, correlation_id)
+        run_started = time.perf_counter()
+        pois, live_poi_lookup, search_source = await self._resolve_pois(
+            constraints,
+            correlation_id,
+            task.session_id,
+        )
+        unfiltered = list(pois)
         pois = _filter_pois_for_planning(pois, list(constraints.interests or []))
+        if not pois and unfiltered:
+            pois = unfiltered
         self._trace(
             "planning_pois_selected",
             correlation_id,
@@ -96,6 +105,7 @@ class PlanningAgent(BaseAgent):
             day_count=itinerary.get("total_days"),
             poi_registry_size=len(poi_registry),
             live_poi_lookup=live_poi_lookup,
+            duration_ms=round((time.perf_counter() - run_started) * 1000, 2),
         )
         return artifact
 
@@ -138,10 +148,11 @@ class PlanningAgent(BaseAgent):
         self,
         constraints: TripConstraints,
         correlation_id: str,
+        session_id: str | None,
     ) -> tuple[list[dict[str, Any]], bool, str]:
         """Return (pois, live_poi_lookup, search_source). Never abort on Overpass failure."""
         try:
-            result = await self._search_pois(constraints, correlation_id)
+            result = await self._search_pois(constraints, correlation_id, session_id)
         except OverpassError as exc:
             self._trace(
                 "poi_lookup_degraded",
@@ -176,6 +187,7 @@ class PlanningAgent(BaseAgent):
         self,
         constraints: TripConstraints,
         correlation_id: str,
+        session_id: str | None,
     ) -> dict[str, Any]:
         assert self.gateway is not None
         self._trace("search_pois", correlation_id, city=constraints.city)
@@ -185,6 +197,7 @@ class PlanningAgent(BaseAgent):
             {
                 "city": constraints.city,
                 "interests": list(constraints.interests or []),
+                "session_id": session_id,
             },
             correlation_id=correlation_id,
         )
@@ -199,6 +212,16 @@ class PlanningAgent(BaseAgent):
     ) -> list[dict[str, Any]]:
         """Use LLM (best-effort) plus well-known attractions when live map data is unavailable."""
         interests = list(constraints.interests or [])
+        well_known = well_known_pois_for_city(constraints.city, interests=interests)
+        if len(well_known) >= 4:
+            self._trace(
+                "fallback_pois_ready",
+                correlation_id,
+                source="well_known",
+                poi_count=len(well_known),
+            )
+            return well_known
+
         llm_pois: list[dict[str, Any]] = []
         if self.llm is not None:
             try:

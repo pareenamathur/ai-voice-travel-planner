@@ -115,7 +115,12 @@ class KnowledgeAgent(BaseAgent):
         guidance = await self.gateway.invoke(
             AgentRole.KNOWLEDGE,
             "retrieve_guidance",
-            {"query": query, "city": city, "top_k": 5},
+            {
+                "query": query,
+                "city": city,
+                "top_k": 5,
+                "session_id": task.session_id,
+            },
             correlation_id=correlation_id,
         )
         if not isinstance(guidance, dict):
@@ -167,13 +172,23 @@ class KnowledgeAgent(BaseAgent):
             self.gateway.invoke(
                 AgentRole.KNOWLEDGE,
                 "search_pois",
-                {"city": city, "interests": interests, "max_results": 12},
+                {
+                    "city": city,
+                    "interests": interests,
+                    "max_results": 12,
+                    "session_id": task.session_id,
+                },
                 correlation_id=task.correlation_id,
             ),
             self.gateway.invoke(
                 AgentRole.KNOWLEDGE,
                 "retrieve_guidance",
-                {"query": guidance_query, "city": city, "top_k": 3},
+                {
+                    "query": guidance_query,
+                    "city": city,
+                    "top_k": 3,
+                    "session_id": task.session_id,
+                },
                 correlation_id=task.correlation_id,
             ),
         )

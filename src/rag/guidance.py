@@ -7,6 +7,8 @@ from typing import Any
 from src.rag.models import RetrievedChunk
 from src.rag.retriever import SemanticRetriever, retrieve
 
+_SESSION_RAG_CACHE: dict[str, dict[str, dict[str, Any]]] = {}
+
 
 def _chunk_to_citation(chunk: RetrievedChunk) -> dict[str, Any]:
     meta = chunk.chunk.metadata or {}
@@ -70,6 +72,7 @@ async def retrieve_guidance(
     city: str,
     top_k: int = 5,
     retriever: SemanticRetriever | None = None,
+    session_id: str | None = None,
 ) -> dict[str, Any]:
     """MCP Gateway handler for ``retrieve_guidance``.
 
@@ -80,6 +83,12 @@ async def retrieve_guidance(
     normalized_query = (query or "").strip()
     if not normalized_city or not normalized_query:
         return {"source": "rag", "chunks": [], "citations": []}
+
+    cache_key = f"{normalized_city.lower()}::{normalized_query.lower()}::{top_k}"
+    if session_id:
+        bucket = _SESSION_RAG_CACHE.setdefault(session_id, {})
+        if cache_key in bucket:
+            return bucket[cache_key]
 
     city_key = normalized_city.lower()
     if retriever is not None:
@@ -93,8 +102,11 @@ async def retrieve_guidance(
 
     chunks = [_chunk_to_payload(item) for item in results]
     citations = [_chunk_to_citation(item) for item in results]
-    return {
+    payload = {
         "source": "rag",
         "chunks": chunks,
         "citations": citations,
     }
+    if session_id:
+        _SESSION_RAG_CACHE.setdefault(session_id, {})[cache_key] = payload
+    return payload

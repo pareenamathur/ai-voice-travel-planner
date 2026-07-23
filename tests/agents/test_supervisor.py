@@ -528,7 +528,8 @@ async def test_review_pass_persists_eval_report_and_approval(
 
     assert result["itinerary_approved"] is True
     assert result["itinerary"] == itinerary
-    assert "approved by Review" in result["response"]
+    assert "approved by Review" not in result["response"]
+    assert "is ready" in result["response"].lower()
     assert result["review_verdict"]["status"] == ReviewStatus.PASS.value
     assert session.itinerary_approved is True
     assert session.itinerary == itinerary
@@ -653,8 +654,8 @@ async def test_review_fail_after_regeneration_returns_best_and_explains(
 
     assert result["itinerary_approved"] is False
     assert result["itinerary"] == best
-    assert "quality checks did not fully pass" in result["response"].lower()
-    assert "one regeneration was already attempted" in result["response"].lower()
+    assert "couldn't finalize" in result["response"].lower()
+    assert "automatic revision" in result["response"].lower()
     assert "feasibility" in result["response"].lower()
     assert "day 1 over budget" in result["response"].lower()
     assert session.itinerary_approved is False
@@ -662,3 +663,21 @@ async def test_review_fail_after_regeneration_returns_best_and_explains(
     assert session.last_review_verdict == ReviewStatus.FAIL.value
     assert session.last_eval_report == report.model_dump(mode="json")
     planning.handle_regen.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_supervisor_emits_handle_message_timing(
+    sessions: SessionManager,
+    obs: Observability,
+):
+    supervisor = SupervisorAgent(
+        llm=LLMAdapter(),
+        gateway=None,
+        observability=obs,
+        session_manager=sessions,
+    )
+    result = await supervisor.handle_message(None, "Hello")
+    spans = obs.get_spans(result["correlation_id"])
+    assert any(s.get("event") == "handle_message_complete" for s in spans)
+    complete = next(s for s in spans if s.get("event") == "handle_message_complete")
+    assert "duration_ms" in complete

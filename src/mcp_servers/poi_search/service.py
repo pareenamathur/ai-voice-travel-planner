@@ -13,6 +13,7 @@ from src.mcp_servers.poi_search.overpass import OverpassClient, OverpassError
 from src.mcp_servers.poi_search.queries import INTEREST_MAP, build_overpass_query
 
 DEFAULT_CITY_CACHE_TTL_SECONDS = 24 * 3600
+_MIN_WELL_KNOWN_FALLBACK_POIS = 4
 
 
 class POISearchService:
@@ -24,6 +25,8 @@ class POISearchService:
     ) -> None:
         self._overpass = overpass
         self.city_cache_ttl_seconds = max(0, int(city_cache_ttl_seconds))
+        # In-process session cache: one successful live lookup per (session, city).
+        self._session_city_cache: dict[str, dict[str, Any]] = {}
 
     async def search_pois(
         self,
@@ -32,6 +35,7 @@ class POISearchService:
         interests: list[str] | None = None,
         max_results: int = 50,
         use_cache: bool = True,
+        session_id: str | None = None,
     ) -> dict[str, Any]:
         """Gateway tool handler for `search_pois`.
 
@@ -43,24 +47,66 @@ class POISearchService:
 
         interests = interests or []
         city_key = _city_cache_key(city, interests)
+        session_key = _session_cache_key(session_id, city)
+
+        if session_key and session_key in self._session_city_cache:
+            cached = self._session_city_cache[session_key]
+            pois = list(cached.get("pois") or [])[: max(1, int(max_results))]
+            if pois:
+                return {
+                    "source": cached.get("source", "osm"),
+                    "pois": pois,
+                    "live_poi_lookup": True,
+                }
 
         if use_cache and self.city_cache_ttl_seconds > 0:
             cached = self._read_city_cache(city_key)
             if cached is not None:
                 pois = list(cached.get("pois") or [])[: max(1, int(max_results))]
-                return {
+                result = {
                     "source": "city_cache",
                     "pois": pois,
                     "live_poi_lookup": True,
                 }
+                self._remember_session(session_key, result)
+                return result
 
+        result = await self._live_search(
+            city=city,
+            interests=interests,
+            max_results=max_results,
+            use_cache=use_cache,
+        )
+        if result.get("live_poi_lookup") and result.get("pois"):
+            self._remember_session(session_key, result)
+            return result
+
+        # Broader Overpass query (default sightseeing) before declaring live lookup failed.
+        if interests:
+            broader = await self._live_search(
+                city=city,
+                interests=["sightseeing"],
+                max_results=max_results,
+                use_cache=use_cache,
+            )
+            if broader.get("live_poi_lookup") and broader.get("pois"):
+                self._remember_session(session_key, broader)
+                return broader
+
+        return result
+
+    async def _live_search(
+        self,
+        *,
+        city: str,
+        interests: list[str],
+        max_results: int,
+        use_cache: bool,
+    ) -> dict[str, Any]:
         query = build_overpass_query(city=city, interests=interests)
-        # Query-hash cache remains useful within a process; city TTL cache reduces
-        # repeated Overpass hits across interest variants during development.
         try:
             payload = await self._overpass.run_query(query, use_cache=use_cache)
         except OverpassError:
-            # True Overpass failure (timeouts, empty after all mirrors, HTTP errors).
             return {
                 "source": "osm",
                 "pois": [],
@@ -70,7 +116,6 @@ class POISearchService:
         elements = payload.get("elements") or []
         pois: list[POI] = []
 
-        # Best-effort category annotation: first recognized interest wins for Phase 1.
         category: str | None = None
         for interest in interests:
             mapped = INTEREST_MAP.get(interest.strip().lower())
@@ -83,7 +128,6 @@ class POISearchService:
             if poi:
                 pois.append(poi)
 
-        # De-dup by osm_id; keep first (Overpass ordering).
         seen: set[str] = set()
         unique: list[POI] = []
         for poi in pois:
@@ -102,9 +146,19 @@ class POISearchService:
         }
 
         if live and use_cache and self.city_cache_ttl_seconds > 0:
+            city_key = _city_cache_key(city, interests)
             self._write_city_cache(city_key, poi_dicts)
 
         return result
+
+    def _remember_session(self, session_key: str | None, result: dict[str, Any]) -> None:
+        if not session_key or not result.get("pois"):
+            return
+        self._session_city_cache[session_key] = {
+            "source": result.get("source"),
+            "pois": list(result.get("pois") or []),
+            "live_poi_lookup": True,
+        }
 
     def _city_cache_path(self, city_key: str) -> Path:
         return self._overpass.cache_dir / f"city-{city_key}.json"
@@ -145,6 +199,13 @@ def _city_cache_key(city: str, interests: list[str] | None = None) -> str:
         return f"{city_part}__sightseeing"
     interest_part = "-".join(interests_norm)
     return f"{city_part}__{interest_part}"
+
+
+def _session_cache_key(session_id: str | None, city: str) -> str | None:
+    if not session_id or not str(session_id).strip():
+        return None
+    slug = re.sub(r"[^a-z0-9]+", "-", (city or "").strip().lower()).strip("-")
+    return f"{session_id.strip()}::{slug or 'unknown'}"
 
 
 def build_default_poi_service(

@@ -24,6 +24,8 @@ export function ChatComposer({
   const speechBaseRef = useRef("");
   const manualEditDuringListenRef = useRef(false);
   const wasListeningRef = useRef(false);
+  const sendingRef = useRef(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const {
     startListening,
@@ -59,24 +61,44 @@ export function ChatComposer({
     wasListeningRef.current = isListening;
   }, [isListening, resetTranscript]);
 
+  const focusInput = useCallback(() => {
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  }, []);
+
   const submitAndClear = useCallback(
     (raw: string) => {
       const trimmed = raw.trim();
-      if (!trimmed) {
+      if (!trimmed || submitDisabled || sendingRef.current) {
         return;
       }
+      sendingRef.current = true;
+      if (isListening) {
+        stopListening();
+      }
+      setDraft("");
+      speechBaseRef.current = "";
+      manualEditDuringListenRef.current = false;
+      resetTranscript();
+      focusInput();
+
       void onSubmitTranscript(trimmed)
-        .then(() => {
-          setDraft("");
-          speechBaseRef.current = "";
-          manualEditDuringListenRef.current = false;
-          resetTranscript();
-        })
         .catch(() => {
-          /* keep draft visible until a successful response */
+          setDraft(trimmed);
+        })
+        .finally(() => {
+          sendingRef.current = false;
         });
     },
-    [onSubmitTranscript, resetTranscript],
+    [
+      focusInput,
+      isListening,
+      onSubmitTranscript,
+      resetTranscript,
+      stopListening,
+      submitDisabled,
+    ],
   );
 
   const handleMicToggle = () => {
@@ -92,11 +114,10 @@ export function ChatComposer({
 
   const handleSend = () => {
     if (isListening) {
-      // Stop listening first; draft already holds speech or user edits — do not auto-send.
       stopListening();
       return;
     }
-    if (!draft.trim() || submitDisabled) {
+    if (!draft.trim() || submitDisabled || sendingRef.current) {
       return;
     }
     submitAndClear(draft);
@@ -114,13 +135,14 @@ export function ChatComposer({
       return;
     }
     event.preventDefault();
-    if (isListening || submitDisabled || !draft.trim()) {
+    if (isListening || submitDisabled || !draft.trim() || sendingRef.current) {
       return;
     }
     submitAndClear(draft);
   };
 
-  const canSend = Boolean(draft.trim()) && !submitDisabled && !isListening;
+  const canSend =
+    Boolean(draft.trim()) && !submitDisabled && !isListening && !sendingRef.current;
 
   return (
     <footer className="chat-composer-wrap" data-testid="chat-composer-wrap">
@@ -159,6 +181,7 @@ export function ChatComposer({
           </button>
 
           <textarea
+            ref={textareaRef}
             className="chat-composer__input"
             value={draft}
             onChange={(event) => handleDraftChange(event.target.value)}

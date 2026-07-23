@@ -49,6 +49,50 @@ describe("ChatComposer", () => {
     expect(input).toHaveValue("");
   });
 
+  it("clears the composer immediately on send before the API resolves", async () => {
+    const user = userEvent.setup();
+    let resolveSubmit: (() => void) | undefined;
+    const onSubmit = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSubmit = resolve;
+        }),
+    );
+
+    render(<ChatComposer onSubmitTranscript={onSubmit} submitDisabled={false} />);
+
+    const input = screen.getByTestId("composer-input");
+    await user.type(input, "yes");
+    await user.click(screen.getByTestId("send-transcript"));
+
+    expect(input).toHaveValue("");
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    resolveSubmit?.();
+    await waitFor(() => expect(input).toHaveValue(""));
+  });
+
+  it("ignores duplicate send clicks while a request is in flight", async () => {
+    const user = userEvent.setup();
+    let resolveSubmit: (() => void) | undefined;
+    const onSubmit = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSubmit = resolve;
+        }),
+    );
+
+    render(<ChatComposer onSubmitTranscript={onSubmit} />);
+
+    const input = screen.getByTestId("composer-input");
+    await user.type(input, "Plan Jaipur");
+    const send = screen.getByTestId("send-transcript");
+    await user.click(send);
+    await user.click(send);
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    resolveSubmit?.();
+  });
+
   it("allows clearing the draft before send", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
