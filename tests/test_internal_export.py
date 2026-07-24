@@ -59,3 +59,72 @@ def test_internal_render_returns_base64(render_secret: str) -> None:
     assert "content_base64" in data
     decoded = base64.b64decode(data["content_base64"])
     assert b"days" in decoded or len(decoded) > 0
+
+
+def test_internal_render_invalid_itinerary_returns_400(render_secret: str) -> None:
+    response = client.post(
+        "/api/internal/export/render",
+        json={
+            "itinerary": {
+                "city": "Jaipur",
+                "total_days": 1,
+                "days": [
+                    {
+                        "day_number": 1,
+                        "activities": [
+                            {
+                                "id": "a1",
+                                "title": "City Palace",
+                                "start_time": "09:00",
+                                "end_time": "10:00",
+                                "duration_minutes": 60,
+                            }
+                        ],
+                        "travel_segments": [],
+                    }
+                ],
+                "poi_registry": {"node/1": {"name": "City Palace"}},
+                "traveler_constraints": {},
+            },
+            "export_format": "pdf",
+        },
+        headers={"X-Export-Render-Key": render_secret},
+    )
+    assert response.status_code == 400
+    assert "poi_registry" in response.json()["detail"].lower()
+
+
+def test_internal_render_unicode_pdf_succeeds(render_secret: str) -> None:
+    response = client.post(
+        "/api/internal/export/render",
+        json={
+            "itinerary": {
+                "city": "Jaipur",
+                "total_days": 1,
+                "days": [
+                    {
+                        "day_number": 1,
+                        "activities": [
+                            {
+                                "id": "a1",
+                                "title": "जयपुर Palace",
+                                "start_time": "09:00",
+                                "end_time": "10:00",
+                                "duration_minutes": 60,
+                            }
+                        ],
+                        "travel_segments": [],
+                    }
+                ],
+                "poi_registry": [],
+                "traveler_constraints": {},
+            },
+            "export_format": "pdf",
+        },
+        headers={"X-Export-Render-Key": render_secret},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "content_base64" in data
+    decoded = base64.b64decode(data["content_base64"])
+    assert decoded[:4] == b"%PDF"
