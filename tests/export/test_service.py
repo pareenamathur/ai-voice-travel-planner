@@ -96,3 +96,27 @@ def test_export_pdf_magic_bytes():
         export_format="pdf",
     )
     assert result["content"][:4] == b"%PDF"
+
+
+def test_export_pdf_handles_unicode_titles():
+    from src.export.service import ExportService
+
+    itinerary = {
+        **SAMPLE_ITINERARY,
+        "days": [
+            {
+                **SAMPLE_ITINERARY["days"][0],
+                "activities": [
+                    {
+                        **SAMPLE_ITINERARY["days"][0]["activities"][0],
+                        "title": "जयपुर Palace",
+                    }
+                ],
+            }
+        ],
+    }
+    result = ExportService().export(
+        itinerary=itinerary,
+        export_format="pdf",
+    )
+    assert result["content"][:4] == b"%PDF"

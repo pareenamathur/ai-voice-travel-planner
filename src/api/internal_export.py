@@ -6,7 +6,8 @@ import base64
 from typing import Any, Literal
 
 from fastapi import APIRouter, Header, HTTPException
-from pydantic import BaseModel, Field
+from fpdf.errors import FPDFUnicodeEncodingException
+from pydantic import BaseModel, Field, ValidationError
 
 from src.api.config import settings
 from src.export.service import ExportService
@@ -36,12 +37,23 @@ async def render_export(
         raise HTTPException(status_code=403, detail="Invalid export render key")
 
     export_format = body.export_format
-    result = ExportService().export(
-        itinerary=body.itinerary,
-        export_format=export_format,
-        trip_title=body.trip_title,
-        extra_citations=body.rag_citations,
-    )
+    try:
+        result = ExportService().export(
+            itinerary=body.itinerary,
+            export_format=export_format,
+            trip_title=body.trip_title,
+            extra_citations=body.rag_citations,
+        )
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except FPDFUnicodeEncodingException as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "The itinerary contains characters that cannot be rendered in a PDF "
+                f"(unsupported by the built-in PDF font). {exc}"
+            ),
+        ) from exc
     content: bytes = result.pop("content")
     result["content_base64"] = base64.b64encode(content).decode("ascii")
     return result

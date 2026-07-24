@@ -154,9 +154,10 @@ def _pdf_section_list(pdf: FPDF, width: float, title: str, items: list[str]) -> 
 
 
 def _pdf_safe_text(value: str) -> str:
-    return (
+    text = (
         value.replace("\u2014", "-")
         .replace("\u2013", "-")
         .replace("\u00b7", "-")
         .replace("\u2022", "-")
     )
+    return text.encode("latin-1", "replace").decode("latin-1")
