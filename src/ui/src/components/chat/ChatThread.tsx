@@ -17,6 +17,8 @@ export interface ChatThreadProps {
   /** Optional: send a suggestion as a full user message. */
   onSuggestionSelect?: (prompt: string) => void;
   suggestionsDisabled?: boolean;
+  /** Replay a completed Supervisor response via speech synthesis. */
+  onReplayResponse?: (responseText: string) => void;
 }
 
 const SUGGESTIONS = [
@@ -46,6 +48,7 @@ export function ChatThread({
   sourceLinks = [],
   onSuggestionSelect,
   suggestionsDisabled = false,
+  onReplayResponse,
 }: ChatThreadProps) {
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -146,6 +149,7 @@ export function ChatThread({
                   <AssistantMessage
                     text={exchange.response.response}
                     sourceLinks={sourceLinks}
+                    onReplay={onReplayResponse}
                   />
                 </div>
               ) : (

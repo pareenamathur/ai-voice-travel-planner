@@ -574,6 +574,29 @@
   white-space: pre-wrap;
 }
 
+.chat-bubble__replay {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--on-surface-variant);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.chat-bubble__replay:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--on-surface);
+}
+
+.chat-bubble__replay .material-symbols-outlined {
+  font-size: 1rem;
+}
+
 .chat-bubble--error .chat-bubble__text {
   border-color: color-mix(in srgb, var(--error) 35%, transparent);
   background: color-mix(in srgb, var(--error) 8%, transparent);

@@ -11,6 +11,7 @@ import {
   isLongRunningHint,
 } from "./api/loadingHint";
 import { useLoadingProgress } from "./api/useLoadingProgress";
+import { useSupervisorSpeech } from "./speech/useSupervisorSpeech";
 import {
   ChatComposer,
   ChatThread,
@@ -41,6 +42,8 @@ export function App() {
     error,
     submitTranscript,
   } = useSupervisorSession();
+
+  const { muted, toggleMuted, replay } = useSupervisorSpeech(conversationHistory);
 
   const [developerMode, setDeveloperMode] = useState(() => {
     try {
@@ -99,6 +102,19 @@ export function App() {
         </div>
 
         <div className="chat-header__actions">
+          <button
+            type="button"
+            className={`chat-header__icon-btn${muted ? " chat-header__icon-btn--active" : ""}`}
+            aria-label={muted ? "Unmute spoken responses" : "Mute spoken responses"}
+            aria-pressed={muted}
+            title={muted ? "Unmute spoken responses" : "Mute spoken responses"}
+            onClick={toggleMuted}
+            data-testid="speech-mute-toggle"
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              {muted ? "volume_off" : "volume_up"}
+            </span>
+          </button>
           <button
             type="button"
             className={`chat-header__icon-btn${developerMode ? " chat-header__icon-btn--active" : ""}`}
@@ -188,6 +204,7 @@ export function App() {
               void submitTranscript(prompt);
             }}
             suggestionsDisabled={loading}
+            onReplayResponse={replay}
           />
 
           {showTripSkeleton ? (
