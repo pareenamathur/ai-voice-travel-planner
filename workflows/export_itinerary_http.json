@@ -12,8 +12,38 @@
       "name": "Export Itinerary Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [260, 320],
+      "position": [260, 360],
       "webhookId": "export-itinerary"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "delivery-email",
+              "leftValue": "={{ ($json.body && $json.body.delivery) ? $json.body.delivery : $json.delivery }}",
+              "rightValue": "email",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b1b2c3d4-route-delivery",
+      "name": "Email delivery?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [520, 360]
     },
     {
       "parameters": {
@@ -34,27 +64,108 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json.body ?? $json) }}",
+        "jsonBody": "={{ JSON.stringify({ itinerary: ($json.body ?? $json).itinerary, export_format: ($json.body ?? $json).export_format || 'pdf', trip_title: ($json.body ?? $json).trip_title, rag_citations: ($json.body ?? $json).rag_citations || [] }) }}",
         "options": {}
       },
-      "id": "b1b2c3d4-http-render",
-      "name": "Render via API",
+      "id": "b1b2c3d4-http-render-download",
+      "name": "Render via API (download)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [520, 320],
+      "position": [780, 500],
       "notesInFlow": true,
-      "notes": "Set n8n env API_EXPORT_RENDER_URL to https://<api-host>/api/internal/export/render and EXPORT_RENDER_SECRET to match backend."
+      "notes": "Download path: returns content_base64 to the API for browser downloads."
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ $json }}"
       },
-      "id": "b1b2c3d4-respond-export",
-      "name": "Respond to Webhook",
+      "id": "b1b2c3d4-respond-download",
+      "name": "Respond (download)",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [780, 320]
+      "position": [1040, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.API_EXPORT_RENDER_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Export-Render-Key",
+              "value": "={{ $env.EXPORT_RENDER_SECRET }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ itinerary: ($json.body ?? $json).itinerary, export_format: ($json.body ?? $json).export_format || 'pdf', trip_title: ($json.body ?? $json).trip_title, rag_citations: ($json.body ?? $json).rag_citations || [] }) }}",
+        "options": {}
+      },
+      "id": "b1b2c3d4-http-render-email",
+      "name": "Render via API (email)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [780, 220],
+      "notesInFlow": true,
+      "notes": "Email path: render PDF before Gmail delivery."
+    },
+    {
+      "parameters": {
+        "jsCode": "const webhook = $('Export Itinerary Webhook').first().json;\nconst body = webhook.body ?? webhook;\nconst render = $input.first().json;\nconst b64 = render.content_base64;\nif (!b64) {\n  throw new Error('Render response missing content_base64');\n}\nconst recipient = body.recipient_email;\nif (!recipient) {\n  throw new Error('recipient_email is required for email delivery');\n}\nconst filename = render.filename || 'itinerary.pdf';\nconst buffer = Buffer.from(b64, 'base64');\nreturn [{\n  json: {\n    recipient_email: recipient,\n    trip_title: render.trip_title || body.trip_title || 'Your trip itinerary',\n    filename,\n  },\n  binary: {\n    attachment: await this.helpers.prepareBinaryData(buffer, filename, render.media_type || 'application/pdf'),\n  },\n}];"
+      },
+      "id": "b1b2c3d4-prepare-email",
+      "name": "Prepare PDF attachment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 220]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.recipient_email }}",
+        "subject": "={{ $json.trip_title || 'Your trip itinerary' }}",
+        "emailType": "html",
+        "message": "<p>Your itinerary is attached as a PDF.</p>",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "attachment"
+              }
+            ]
+          }
+        }
+      },
+      "id": "b1b2c3d4-gmail-send",
+      "name": "Send Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1280, 220],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "CONFIGURE_IN_N8N",
+          "name": "Gmail account"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Connect your Gmail OAuth credential in n8n Cloud. No recipient is hardcoded."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'Itinerary emailed successfully' } }}"
+      },
+      "id": "b1b2c3d4-respond-email",
+      "name": "Respond (email)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1520, 220]
     }
   ],
   "connections": {
@@ -62,18 +173,69 @@
       "main": [
         [
           {
-            "node": "Render via API",
+            "node": "Email delivery?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Render via API": {
+    "Email delivery?": {
       "main": [
         [
           {
-            "node": "Respond to Webhook",
+            "node": "Render via API (email)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Render via API (download)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render via API (download)": {
+      "main": [
+        [
+          {
+            "node": "Respond (download)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render via API (email)": {
+      "main": [
+        [
+          {
+            "node": "Prepare PDF attachment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare PDF attachment": {
+      "main": [
+        [
+          {
+            "node": "Send Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Gmail": {
+      "main": [
+        [
+          {
+            "node": "Respond (email)",
             "type": "main",
             "index": 0
           }
@@ -85,7 +247,7 @@
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "export-itinerary-http-v1",
+  "versionId": "export-itinerary-http-v2",
   "meta": {
     "templateCredsSetupCompleted": true
   },

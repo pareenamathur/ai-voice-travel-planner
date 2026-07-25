@@ -46,3 +46,34 @@ export function downloadBlob(blob: Blob, filename: string): void {
   anchor.remove();
   URL.revokeObjectURL(url);
 }
+
+export interface SessionExportEmailRequest {
+  session_id: string;
+  email: string;
+}
+
+export interface SessionExportEmailResponse {
+  success: boolean;
+  message: string;
+}
+
+export async function postSessionExportEmail(
+  request: SessionExportEmailRequest,
+): Promise<SessionExportEmailResponse> {
+  const url = `${getApiBaseUrl()}/api/session/export/email`;
+  logApiRequest("POST", url, request);
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const error = await parseError(response);
+    logApiError("POST", url, { status: response.status, message: error.message });
+    throw error;
+  }
+
+  return (await response.json()) as SessionExportEmailResponse;
+}

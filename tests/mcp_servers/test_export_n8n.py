@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.export.service import ExportService
-from src.mcp_servers.export.n8n_client import ExportWebhookError, invoke_n8n_export
+from src.mcp_servers.export.n8n_client import ExportWebhookError, invoke_n8n_export, invoke_n8n_export_email
 
 _ITINERARY = {
     "city": "Jaipur",
@@ -121,3 +121,64 @@ async def test_trigger_export_gateway_delegates_to_n8n():
 
     mocked.assert_awaited_once()
     assert result == expected
+
+
+@pytest.mark.asyncio
+async def test_invoke_n8n_export_email_posts_delivery_payload():
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json = lambda: {
+        "success": True,
+        "message": "Itinerary emailed successfully",
+    }
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch(
+            "src.mcp_servers.export.n8n_client.settings.n8n_export_webhook_url",
+            "https://n8n.example/webhook/export-itinerary",
+        ),
+        patch("src.mcp_servers.export.n8n_client.httpx.AsyncClient", return_value=mock_client),
+    ):
+        result = await invoke_n8n_export_email(
+            itinerary=_ITINERARY,
+            recipient_email="traveler@example.com",
+            trip_title="Jaipur — 1-Day Trip",
+            rag_citations=[{"section": "Wikivoyage"}],
+        )
+
+    mock_client.post.assert_awaited_once()
+    _args, kwargs = mock_client.post.await_args
+    assert kwargs["json"]["delivery"] == "email"
+    assert kwargs["json"]["recipient_email"] == "traveler@example.com"
+    assert kwargs["json"]["export_format"] == "pdf"
+    assert result["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_invoke_n8n_export_email_requires_success_flag():
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json = lambda: {"success": False, "message": "Gmail failed"}
+
+    mock_client = AsyncMock()
+    mock_client.post = AsyncMock(return_value=mock_response)
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch(
+            "src.mcp_servers.export.n8n_client.settings.n8n_export_webhook_url",
+            "https://n8n.example/webhook/export-itinerary",
+        ),
+        patch("src.mcp_servers.export.n8n_client.httpx.AsyncClient", return_value=mock_client),
+    ):
+        with pytest.raises(ExportWebhookError, match="Gmail failed"):
+            await invoke_n8n_export_email(
+                itinerary=_ITINERARY,
+                recipient_email="traveler@example.com",
+            )

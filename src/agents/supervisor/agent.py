@@ -666,6 +666,69 @@ class SupervisorAgent(BaseAgent):
             "format": result.payload.get("format"),
         }
 
+    async def handle_export_email(
+        self,
+        session_id: str,
+        email: str,
+        correlation_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Email an approved itinerary PDF via n8n (approved itineraries only)."""
+        from src.mcp_servers.export.n8n_client import ExportWebhookError, invoke_n8n_export_email
+
+        corr_id = self._resolve_correlation_id(correlation_id)
+        session = self.sessions.read(session_id)
+
+        if not session.itinerary or not session.itinerary_approved:
+            self._trace(
+                "export_email_blocked",
+                corr_id,
+                session_id=session_id,
+                itinerary_approved=session.itinerary_approved,
+            )
+            return {
+                "error": EXPORT_NOT_APPROVED_MESSAGE,
+                "approved": False,
+            }
+
+        city = str(session.itinerary.get("city") or session.trip_constraints.city or "Trip")
+        days = session.itinerary.get("total_days") or session.trip_constraints.days or "?"
+        trip_title = f"{_title(city)} — {days}-Day Trip"
+
+        self._trace(
+            "supervisor_dispatch_export_email",
+            corr_id,
+            session_id=session_id,
+            recipient_email=email,
+        )
+
+        try:
+            result = await invoke_n8n_export_email(
+                itinerary=dict(session.itinerary),
+                recipient_email=email,
+                trip_title=trip_title,
+                rag_citations=list(session.rag_citations),
+            )
+        except ExportWebhookError as exc:
+            self._trace(
+                "export_email_failed",
+                corr_id,
+                session_id=session_id,
+                error=str(exc)[:300],
+            )
+            return {"error": str(exc), "approved": True}
+
+        self._trace(
+            "export_email_complete",
+            corr_id,
+            session_id=session_id,
+            recipient_email=email,
+        )
+        return {
+            "approved": True,
+            "success": bool(result.get("success", True)),
+            "message": str(result.get("message") or "Itinerary emailed successfully"),
+        }
+
 
 def _format_edit_response(itinerary: dict[str, Any], scope: Any) -> str:
     day_number = getattr(scope, "day", None) or "?"
