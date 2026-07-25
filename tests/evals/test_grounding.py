@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.agents.planning.agent import LIVE_POI_UNAVAILABLE_NOTE
 from src.evals.grounding import evaluate_grounding
 
 
@@ -123,7 +124,7 @@ def test_degraded_lookup_with_disclaimer_passes() -> None:
     itinerary = _itinerary(
         metadata={
             "live_poi_lookup": False,
-            "user_note": "Live place lookup was temporarily unavailable.",
+            "user_note": LIVE_POI_UNAVAILABLE_NOTE,
         }
     )
     assert evaluate_grounding(itinerary).passed

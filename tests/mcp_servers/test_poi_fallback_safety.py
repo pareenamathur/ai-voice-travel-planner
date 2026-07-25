@@ -9,6 +9,7 @@ import pytest
 from src.agents.planning.agent import LIVE_POI_UNAVAILABLE_NOTE, PlanningAgent
 from src.mcp_servers.poi_search.fallback import (
     curated_pois_for_city,
+    ensure_poi_source_labels,
     is_curated_poi,
     is_live_poi,
     merge_live_and_curated_pois,
@@ -187,3 +188,106 @@ async def test_full_fallback_uses_only_curated_sources():
     assert all(is_curated_poi(poi) for poi in build_pois)
     assert artifact.itinerary["metadata"]["live_poi_lookup"] is False
     assert LIVE_POI_UNAVAILABLE_NOTE in str(artifact.itinerary["metadata"].get("user_note") or "")
+
+
+def test_cached_osm_without_source_counts_as_live():
+    cached = {
+        "osm_id": "node/555",
+        "name": "Cached Fort",
+        "lat": 26.9,
+        "lon": 75.8,
+        "category": "landmark",
+    }
+    assert is_live_poi(cached) is True
+    labeled = ensure_poi_source_labels([cached])
+    assert labeled[0]["source"] == "osm"
+
+
+def test_well_known_ids_are_not_treated_as_live():
+    curated = curated_pois_for_city("Jaipur", interests=["culture"])[0]
+    assert is_live_poi(curated) is False
+
+
+@pytest.mark.asyncio
+async def test_cached_osm_without_source_does_not_trigger_unavailable_note():
+    class CachedGateway(_RecordingGateway):
+        async def _search_pois(self, **kwargs):
+            return {
+                "source": "city_cache",
+                "live_poi_lookup": True,
+                "pois": [
+                    {
+                        "osm_id": "node/777",
+                        "name": "Cached Palace",
+                        "lat": 26.91,
+                        "lon": 75.79,
+                        "category": "culture",
+                    }
+                ],
+            }
+
+    gateway = CachedGateway()
+    agent = PlanningAgent(LLMAdapter(), gateway, Observability())
+    task = TaskMessage(
+        task_type=TaskType.PLAN,
+        session_id="sess-cached-osm",
+        correlation_id="corr-cached-osm",
+        payload={"constraints": {"city": "Jaipur", "days": 2, "interests": ["culture"]}},
+    )
+    artifact = await agent.run(task)
+    metadata = artifact.itinerary["metadata"]
+    assert metadata["live_poi_lookup"] is True
+    assert LIVE_POI_UNAVAILABLE_NOTE not in str(metadata.get("user_note") or "")
+    build_pois = gateway.calls[1][2]["pois"]
+    assert any(poi.get("source") == "osm" for poi in build_pois)
+
+
+@pytest.mark.asyncio
+async def test_all_live_results_do_not_show_unavailable_note():
+    class LiveOnlyGateway(_RecordingGateway):
+        async def _search_pois(self, **kwargs):
+            return {
+                "source": "osm",
+                "live_poi_lookup": True,
+                "pois": [
+                    {
+                        "osm_id": "node/1",
+                        "name": "Live Museum",
+                        "lat": 26.9,
+                        "lon": 75.8,
+                        "source": "osm",
+                        "category": "culture",
+                    },
+                    {
+                        "osm_id": "node/2",
+                        "name": "Live Fort",
+                        "lat": 26.91,
+                        "lon": 75.81,
+                        "source": "osm",
+                        "category": "adventure",
+                    },
+                ],
+            }
+
+    gateway = LiveOnlyGateway()
+    agent = PlanningAgent(LLMAdapter(), gateway, Observability())
+    task = TaskMessage(
+        task_type=TaskType.PLAN,
+        session_id="sess-all-live",
+        correlation_id="corr-all-live",
+        payload={
+            "constraints": {
+                "city": "Jaipur",
+                "days": 2,
+                "interests": ["culture", "adventure"],
+            }
+        },
+    )
+    artifact = await agent.run(task)
+    metadata = artifact.itinerary["metadata"]
+    assert metadata["live_poi_lookup"] is True
+    assert "user_note" not in metadata or LIVE_POI_UNAVAILABLE_NOTE not in str(
+        metadata.get("user_note") or ""
+    )
+    build_pois = gateway.calls[1][2]["pois"]
+    assert all(is_live_poi(poi) for poi in build_pois)

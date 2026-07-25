@@ -11,6 +11,7 @@ from src.mcp_servers.poi_search.fallback import (
     UNVERIFIED_INTERESTS_NOTE,
     curated_for_missing_interests,
     curated_pois_for_city,
+    ensure_poi_source_labels,
     is_live_poi,
     merge_live_and_curated_pois,
     missing_curated_interests,
@@ -189,7 +190,7 @@ class PlanningAgent(BaseAgent):
             source = pois[0].get("source", "well_known") if pois else "well_known"
             return pois, False, str(source)
 
-        pois = result.get("pois") or []
+        pois = ensure_poi_source_labels(list(result.get("pois") or []))
         if not isinstance(pois, list):
             raise ValueError("search_pois.pois must be a list")
 

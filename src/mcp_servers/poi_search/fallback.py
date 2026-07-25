@@ -17,8 +17,8 @@ CURATED_SOURCE = "well_known"
 LIVE_SOURCES = frozenset({"osm", "city_cache"})
 
 LIVE_POI_UNAVAILABLE_NOTE = (
-    "Live place lookup was temporarily unavailable. This itinerary uses curated "
-    "destination guidance instead of live map data."
+    "Live map verification is temporarily limited. Some suggestions are from the "
+    "curated fallback catalogue."
 )
 
 UNVERIFIED_INTERESTS_NOTE = (
@@ -166,8 +166,30 @@ def has_curated_catalog(city: str) -> bool:
     return bool(WELL_KNOWN_BY_CITY.get(key))
 
 
+_OSM_ID_PREFIXES = ("node/", "way/", "relation/")
+
+
 def is_live_poi(poi: dict[str, Any]) -> bool:
-    return str(poi.get("source") or "").strip().lower() in LIVE_SOURCES
+    source = str(poi.get("source") or "").strip().lower()
+    if source == CURATED_SOURCE:
+        return False
+    if source in LIVE_SOURCES:
+        return True
+    osm_id = str(poi.get("osm_id") or "")
+    return osm_id.startswith(_OSM_ID_PREFIXES)
+
+
+def ensure_poi_source_labels(pois: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Backfill ``source`` on cached OSM rows that omitted the field."""
+    labeled: list[dict[str, Any]] = []
+    for poi in pois:
+        item = dict(poi)
+        source = str(item.get("source") or "").strip().lower()
+        osm_id = str(item.get("osm_id") or "")
+        if not source and osm_id.startswith(_OSM_ID_PREFIXES):
+            item["source"] = "osm"
+        labeled.append(item)
+    return labeled
 
 
 def is_curated_poi(poi: dict[str, Any]) -> bool:

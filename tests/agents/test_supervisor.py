@@ -352,7 +352,7 @@ async def test_approved_response_includes_live_poi_unavailable_note(
     plan = await supervisor.handle_message(confirm["session_id"], "yes")
 
     assert LIVE_POI_UNAVAILABLE_NOTE in plan["response"]
-    assert "Live place lookup was temporarily unavailable" in plan["response"]
+    assert "temporarily limited" in plan["response"]
 
 
 @pytest.mark.asyncio

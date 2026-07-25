@@ -208,6 +208,52 @@ async def test_all_live_lookups_fail_finish_within_budget(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_city_cache_without_source_labels_pois_as_live(tmp_path) -> None:
+    import json
+    import time
+
+    from src.mcp_servers.poi_search.fallback import is_live_poi
+    from src.mcp_servers.poi_search.service import POISearchService, _city_cache_key
+
+    overpass = OverpassClient(base_urls=["https://example.test/api"], cache_dir=tmp_path)
+    overpass.run_query = AsyncMock(return_value={"elements": []})
+    service = POISearchService(overpass=overpass, city_cache_ttl_seconds=3600)
+
+    city_key = _city_cache_key("Jaipur", ["food", "adventure"])
+    cache_path = service._city_cache_path(city_key)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(
+        json.dumps(
+            {
+                "cached_at": time.time(),
+                "pois": [
+                    {
+                        "osm_id": "node/42",
+                        "name": "Cached Cafe",
+                        "lat": 26.91,
+                        "lon": 75.79,
+                        "category": "food",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = await service.search_pois(
+        city="Jaipur",
+        interests=["food", "adventure"],
+        use_cache=True,
+    )
+
+    assert result["live_poi_lookup"] is True
+    assert result["source"] == "city_cache"
+    assert all(is_live_poi(poi) for poi in result["pois"])
+    assert result["pois"][0]["source"] == "osm"
+    overpass.run_query.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_broader_fallback_skipped_when_live_results_are_sufficient(tmp_path) -> None:
     elements = [
         {
