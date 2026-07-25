@@ -7,8 +7,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 DEFAULT_OVERPASS_MIRRORS = (
-    "https://lz4.overpass-api.de/api/interpreter,"
-    "https://overpass.kumi.systems/api/interpreter"
+    "https://overpass.private.coffee/api/interpreter,"
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
 )
 DEFAULT_POI_CITY_CACHE_TTL_SECONDS = 24 * 3600
 

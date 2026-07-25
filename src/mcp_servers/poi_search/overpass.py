@@ -14,11 +14,8 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# Identify this app to the public Overpass front-end (avoids Apache 406 on generic clients).
-DEFAULT_USER_AGENT = (
-    "AI-Voice-Travel-Planner/0.1 "
-    "(+https://github.com/pareenamathur/ai-voice-travel-planner)"
-)
+# Identify this app to public Overpass front-ends (required by some mirrors).
+DEFAULT_USER_AGENT = "AI-Voice-Travel-Planner/1.0"
 DEFAULT_REFERER = "https://github.com/pareenamathur/ai-voice-travel-planner"
 
 # Retry transient Overpass / gateway failures with exponential backoff per mirror.
@@ -110,10 +107,7 @@ class OverpassClient:
                             attempt + 1,
                             exc,
                         )
-                        if attempt < self.max_attempts_per_mirror - 1:
-                            delay = self.backoff_base_seconds * (2**attempt)
-                            await asyncio.sleep(delay)
-                            continue
+                        # Unreachable or timed-out host — try the next independent mirror.
                         break
 
                     if resp.status_code == 200:

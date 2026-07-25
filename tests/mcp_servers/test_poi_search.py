@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import httpx
 import pytest
-from src.api.config import DEFAULT_OVERPASS_URL, Settings
+from src.api.config import DEFAULT_OVERPASS_MIRRORS, DEFAULT_OVERPASS_URL, Settings
 from src.mcp_servers.poi_search.models import POI, osm_element_to_poi
 from src.mcp_servers.poi_search.overpass import (
     DEFAULT_REFERER,
@@ -275,6 +276,118 @@ async def test_overpass_fails_over_to_next_mirror(tmp_path: Path):
 
     assert hosts == ["primary.test", "mirror.test"]
     assert payload["elements"][0]["id"] == 99
+
+
+def test_default_overpass_mirror_list_uses_independent_instances():
+    cfg = Settings(_env_file=None)
+    assert cfg.overpass_urls() == [
+        DEFAULT_OVERPASS_URL,
+        "https://overpass.private.coffee/api/interpreter",
+        "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    ]
+    assert "kumi.systems" not in DEFAULT_OVERPASS_MIRRORS
+    assert "lz4.overpass-api.de" not in DEFAULT_OVERPASS_MIRRORS
+
+
+@pytest.mark.asyncio
+async def test_overpass_transport_failure_tries_next_mirror_without_retries(tmp_path: Path):
+    query = "[out:json];node(0,0,1,1);out;"
+    hosts: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        hosts.append(str(request.url.host))
+        if request.url.host == "primary.test":
+            raise httpx.ConnectError("connection refused")
+        return httpx.Response(
+            200,
+            json={
+                "elements": [
+                    {
+                        "type": "node",
+                        "id": 42,
+                        "lat": 26.9,
+                        "lon": 75.8,
+                        "tags": {"name": "Mirror POI"},
+                    }
+                ]
+            },
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        oc = OverpassClient(
+            base_urls=[
+                "https://primary.test/api/interpreter",
+                "https://mirror.test/api/interpreter",
+            ],
+            cache_dir=tmp_path,
+            client=client,
+            max_attempts_per_mirror=3,
+        )
+        payload = await oc.run_query(query, use_cache=False)
+
+    assert hosts == ["primary.test", "mirror.test"]
+    assert payload["elements"][0]["id"] == 42
+
+
+@pytest.mark.asyncio
+async def test_overpass_all_mirrors_unreachable_finish_quickly(tmp_path: Path):
+    query = "[out:json];node(0,0,1,1);out;"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused")
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        oc = OverpassClient(
+            base_urls=[
+                "https://mirror-a.test/api/interpreter",
+                "https://mirror-b.test/api/interpreter",
+                "https://mirror-c.test/api/interpreter",
+            ],
+            cache_dir=tmp_path,
+            client=client,
+            max_attempts_per_mirror=3,
+        )
+        started = time.perf_counter()
+        with pytest.raises(OverpassError, match="transport error"):
+            await oc.run_query(query, use_cache=False)
+        elapsed = time.perf_counter() - started
+
+    assert elapsed < 5.0
+
+
+@pytest.mark.asyncio
+async def test_overpass_successful_results_keep_osm_source(tmp_path: Path):
+    query = "[out:json];node(0,0,1,1);out;"
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            200,
+            json={
+                "elements": [
+                    {
+                        "type": "node",
+                        "id": 7,
+                        "lat": 26.9,
+                        "lon": 75.8,
+                        "tags": {"name": "Live Cafe", "amenity": "cafe"},
+                    }
+                ]
+            },
+        )
+    )
+    async with httpx.AsyncClient(transport=transport) as client:
+        oc = OverpassClient(
+            base_url="https://overpass.test/api/interpreter",
+            cache_dir=tmp_path,
+            client=client,
+        )
+        service = POISearchService(overpass=oc)
+        result = await service.search_pois(city="Jaipur", interests=["food"], use_cache=False)
+
+    assert result["live_poi_lookup"] is True
+    assert result["source"] == "osm"
+    assert all(poi.get("source") == "osm" for poi in result["pois"])
 
 
 def test_overpass_url_configurable_via_env(monkeypatch: pytest.MonkeyPatch):
