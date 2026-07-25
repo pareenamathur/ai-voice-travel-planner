@@ -29,15 +29,24 @@ def _adventure_element() -> dict:
     }
 
 
+def _elements_for_query(query: str) -> list[dict]:
+    elements: list[dict] = []
+    if any(token in query for token in ("restaurant", "cafe", "fast_food", "amenity")):
+        elements.append(_food_element())
+    if any(token in query for token in ("sports_centre", "sport", "theme_park")):
+        elements.append(_adventure_element())
+    return elements
+
+
 @pytest.mark.asyncio
 async def test_multi_interest_search_merges_supplemental_results(tmp_path) -> None:
     calls: list[str] = []
 
     async def run_query(query: str, *, use_cache: bool = True) -> dict:
         calls.append(query)
-        if "sports_centre" in query or "sport" in query:
-            return {"elements": [_adventure_element()]}
-        return {"elements": [_food_element()]}
+        if len(calls) == 1:
+            raise OverpassError("combined failed")
+        return {"elements": _elements_for_query(query)}
 
     overpass = OverpassClient(base_urls=["https://example.test/api"], cache_dir=tmp_path)
     overpass.run_query = AsyncMock(side_effect=run_query)
