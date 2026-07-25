@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from src.mcp_servers.poi_search.fallback import ensure_poi_source_labels
 from src.mcp_servers.poi_search.models import POI, osm_element_to_poi
 from src.mcp_servers.poi_search.overpass import OverpassClient, OverpassError
 from src.mcp_servers.poi_search.queries import INTEREST_MAP, build_overpass_query
@@ -75,7 +76,9 @@ class POISearchService:
 
         if session_key and session_key in self._session_city_cache:
             cached = self._session_city_cache[session_key]
-            pois = list(cached.get("pois") or [])[: max(1, int(max_results))]
+            pois = ensure_poi_source_labels(list(cached.get("pois") or []))[
+                : max(1, int(max_results))
+            ]
             if pois:
                 logger.info(
                     "poi_search_session_cache_hit city=%s interests=%s poi_count=%s",
@@ -92,7 +95,9 @@ class POISearchService:
         if use_cache and self.city_cache_ttl_seconds > 0:
             cached = self._read_city_cache(city_key)
             if cached is not None:
-                pois = list(cached.get("pois") or [])[: max(1, int(max_results))]
+                pois = ensure_poi_source_labels(list(cached.get("pois") or []))[
+                    : max(1, int(max_results))
+                ]
                 result = {
                     "source": "city_cache",
                     "pois": pois,
