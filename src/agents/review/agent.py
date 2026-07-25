@@ -18,6 +18,7 @@ from src.evals import (
     evaluate_edit_correctness,
     evaluate_feasibility,
     evaluate_grounding,
+    evaluate_interest_coverage,
 )
 from src.shared.messages.types import (
     AgentRole,
@@ -34,7 +35,7 @@ if TYPE_CHECKING:
     from src.agents.edit.agent import EditAgent
     from src.agents.planning.agent import PlanningAgent
 
-PLAN_EVAL_NAMES = ("feasibility", "grounding")
+PLAN_EVAL_NAMES = ("feasibility", "grounding", "interest_coverage")
 EDIT_EVAL_NAMES = ("feasibility", "grounding", "edit_correctness")
 
 
@@ -210,6 +211,14 @@ class ReviewAgent(BaseAgent):
                     plan.itinerary,
                     poi_registry=plan.poi_registry,
                     rag_citations=plan.rag_citations,
+                )
+            )
+        if "interest_coverage" in names:
+            entries.append(
+                evaluate_interest_coverage(
+                    plan.itinerary,
+                    constraints=plan.constraints,
+                    poi_registry=plan.poi_registry,
                 )
             )
         return EvalReport(entries=entries)

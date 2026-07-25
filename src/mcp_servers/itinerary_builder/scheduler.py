@@ -12,6 +12,7 @@ from src.mcp_servers.itinerary_builder.travel import (
     infer_transport_mode,
 )
 from src.mcp_servers.poi_search.models import POI
+from src.shared.interests import normalize_interests, poi_satisfies_interest
 from src.shared.itinerary import (
     Activity,
     DayPlan,
@@ -503,6 +504,30 @@ def _period_note(start_minute: int) -> str:
     return "Evening"
 
 
+def _ensure_interest_coverage(pois: list[POI], interests: list[str]) -> list[POI]:
+    """Prioritize POIs so each requested interest appears at least once when possible."""
+    requested = normalize_interests(interests)
+    if not requested or not pois:
+        return list(pois)
+
+    selected: list[POI] = []
+    remaining = list(pois)
+    for interest in requested:
+        match = next(
+            (
+                poi
+                for poi in remaining
+                if poi_satisfies_interest(poi.model_dump(), interest)
+            ),
+            None,
+        )
+        if match is not None:
+            selected.append(match)
+            remaining.remove(match)
+
+    return selected + remaining
+
+
 def schedule_itinerary(
     *,
     city: str,
@@ -519,6 +544,10 @@ def schedule_itinerary(
     resolved_config = config or SchedulerConfig()
     constraints = traveler_constraints or TravelerConstraints()
     unique_pois = _deduplicate_pois(pois)
+    unique_pois = _ensure_interest_coverage(
+        unique_pois,
+        list(constraints.interests or []),
+    )
     day_assignments = _distribute_pois_to_days(unique_pois, total_days)
 
     days: list[DayPlan] = []

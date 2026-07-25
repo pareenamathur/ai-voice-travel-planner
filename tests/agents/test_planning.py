@@ -176,7 +176,8 @@ async def test_search_pois_and_build_itinerary_invoked_once_each(
     build_params = gateway.calls[1][2]
     assert build_params["city"] == "Jaipur"
     assert build_params["total_days"] == 2
-    assert build_params["pois"] == SAMPLE_POIS
+    build_poi_ids = {poi["osm_id"] for poi in build_params["pois"]}
+    assert {poi["osm_id"] for poi in SAMPLE_POIS}.issubset(build_poi_ids)
     assert build_params["traveler_constraints"]["pace"] == "relaxed"
 
 
@@ -302,7 +303,7 @@ async def test_overpass_error_falls_back_without_aborting_plan(obs: Observabilit
     assert tool_names == ["search_pois", "build_itinerary"]
     build_pois = gateway.calls[1][2]["pois"]
     assert build_pois
-    assert all(p.get("source") in {"llm", "well_known"} for p in build_pois)
+    assert all(p.get("source") == "well_known" for p in build_pois)
 
     events = [span["event"] for span in obs.get_spans("corr-plan-1")]
     assert "planning_started" in events
@@ -312,7 +313,7 @@ async def test_overpass_error_falls_back_without_aborting_plan(obs: Observabilit
 
 
 @pytest.mark.asyncio
-async def test_empty_poi_search_falls_back_to_llm_well_known(obs: Observability):
+async def test_empty_poi_search_falls_back_to_curated_catalog(obs: Observability):
     class EmptySearchGateway(RecordingGateway):
         async def _search_pois(self, **kwargs: Any) -> dict[str, Any]:
             return {"source": "osm", "pois": [], "live_poi_lookup": False}
@@ -324,7 +325,7 @@ async def test_empty_poi_search_falls_back_to_llm_well_known(obs: Observability)
 
     assert artifact.itinerary["metadata"]["live_poi_lookup"] is False
     assert gateway.calls[1][2]["pois"]
-    assert artifact.metadata["search_source"] in {"llm", "well_known"}
+    assert artifact.metadata["search_source"] == "well_known"
 
 
 @pytest.mark.asyncio

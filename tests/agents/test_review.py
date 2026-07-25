@@ -234,7 +234,11 @@ async def test_pass_on_first_review(review: ReviewAgent, planning: MagicMock):
     assert verdict.correlation_id == "corr-review-1"
     assert verdict.final_artifact == artifact.itinerary
     assert verdict.eval_report.all_passed
-    assert {e.name for e in verdict.eval_report.entries} == {"feasibility", "grounding"}
+    assert {e.name for e in verdict.eval_report.entries} == {
+        "feasibility",
+        "grounding",
+        "interest_coverage",
+    }
     planning.handle_regen.assert_not_awaited()
 
 
@@ -341,7 +345,7 @@ async def test_eval_report_aggregates_rerun_of_failed_only(
 
     verdict = await review.run(bad)
     names = [e.name for e in verdict.eval_report.entries]
-    assert names == ["feasibility", "grounding"]
+    assert names == ["feasibility", "grounding", "interest_coverage"]
     assert all(e.passed for e in verdict.eval_report.entries)
 
 

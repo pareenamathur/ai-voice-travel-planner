@@ -56,6 +56,48 @@ INTEREST_MAP: dict[str, InterestQuery] = {
             'nwr["amenity"="marketplace"](area.searchArea);',
         ],
     ),
+    # Nature / parks / outdoors
+    "nature": InterestQuery(
+        category="nature",
+        clauses=[
+            'nwr["leisure"="park"](area.searchArea);',
+            'nwr["leisure"="nature_reserve"](area.searchArea);',
+            'nwr["natural"](area.searchArea);',
+            'nwr["tourism"="viewpoint"](area.searchArea);',
+        ],
+    ),
+    # Adventure / outdoor activities
+    "adventure": InterestQuery(
+        category="adventure",
+        clauses=[
+            'nwr["leisure"="sports_centre"](area.searchArea);',
+            'nwr["sport"](area.searchArea);',
+            'nwr["tourism"="theme_park"](area.searchArea);',
+            'nwr["tourism"="zoo"](area.searchArea);',
+            'nwr["tourism"="attraction"]["attraction"~"hiking|climbing|adventure|safari|zip|trek"](area.searchArea);',
+            'nwr["leisure"="track"](area.searchArea);',
+        ],
+    ),
+    # Nightlife
+    "nightlife": InterestQuery(
+        category="nightlife",
+        clauses=[
+            'nwr["amenity"="bar"](area.searchArea);',
+            'nwr["amenity"="pub"](area.searchArea);',
+            'nwr["amenity"="nightclub"](area.searchArea);',
+        ],
+    ),
+    # Family-friendly attractions
+    "family": InterestQuery(
+        category="family",
+        clauses=[
+            'nwr["tourism"="zoo"](area.searchArea);',
+            'nwr["tourism"="theme_park"](area.searchArea);',
+            'nwr["tourism"="aquarium"](area.searchArea);',
+            'nwr["leisure"="playground"](area.searchArea);',
+            'nwr["tourism"="museum"](area.searchArea);',
+        ],
+    ),
 }
 
 
@@ -68,16 +110,23 @@ def build_overpass_query(*, city: str, interests: list[str], timeout_s: int = 25
       heuristic for Phase 1 (Jaipur-focused); later phases can add better disambiguation.
     """
 
-    interests_norm = [i.strip().lower() for i in interests if i.strip()]
+    from src.shared.interests import search_keys_for_interests
+
+    search_keys = search_keys_for_interests(interests)
     clauses: list[str] = []
-    for interest in interests_norm:
-        mapped = INTEREST_MAP.get(interest)
-        if mapped:
-            clauses.extend(mapped.clauses)
+    seen_clauses: set[str] = set()
+    for key in search_keys:
+        mapped = INTEREST_MAP.get(key)
+        if not mapped:
+            continue
+        for clause in mapped.clauses:
+            if clause not in seen_clauses:
+                seen_clauses.add(clause)
+                clauses.append(clause)
 
     if not clauses:
         # Sensible default for empty/unknown interests.
-        clauses = INTEREST_MAP["landmark"].clauses
+        clauses = list(INTEREST_MAP["landmark"].clauses)
 
     city_escaped = city.replace('"', '\\"')
 

@@ -73,6 +73,15 @@ SAMPLE_ITINERARY = {
                     "end_time": "12:30",
                     "duration_minutes": 90,
                 },
+                {
+                    "id": "d1-a3",
+                    "title": "Laxmi Misthan Bhandar (LMB)",
+                    "poi_id": "well_known/jaipur-lmb",
+                    "category": "food",
+                    "start_time": "13:00",
+                    "end_time": "14:00",
+                    "duration_minutes": 60,
+                },
             ],
             "travel_segments": [],
         },
@@ -99,7 +108,15 @@ SAMPLE_ITINERARY = {
             "longitude": 75.8513,
             "category": "culture",
             "source": "osm",
-        }
+        },
+        {
+            "poi_id": "well_known/jaipur-lmb",
+            "name": "Laxmi Misthan Bhandar (LMB)",
+            "latitude": 26.9190,
+            "longitude": 75.8265,
+            "category": "food",
+            "source": "well_known",
+        },
     ],
     "citations": [],
     "metadata": {"scheduler": "heuristic_v1"},
@@ -221,7 +238,7 @@ async def test_session_updated_and_itinerary_approved(
     assert session.last_review_verdict == ReviewStatus.PASS.value
     assert session.last_eval_report is not None
     entry_names = {e["name"] for e in session.last_eval_report["entries"]}
-    assert entry_names == {"feasibility", "grounding"}
+    assert entry_names == {"feasibility", "grounding", "interest_coverage"}
     assert all(e["passed"] for e in session.last_eval_report["entries"])
     assert "node/1" in session.poi_registry
     assert session.conversation_phase.value == "active"
