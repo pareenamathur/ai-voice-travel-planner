@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -17,7 +18,21 @@ from src.shared.interests import missing_interests, normalize_interests, search_
 logger = logging.getLogger(__name__)
 
 DEFAULT_CITY_CACHE_TTL_SECONDS = 24 * 3600
+DEFAULT_POI_SEARCH_BUDGET_SECONDS = 45.0
 _MIN_POIS_TO_SKIP_BROADER_SEARCH = 6
+
+
+class _SearchBudget:
+    """Monotonic deadline for bounded live POI lookup within one search_pois call."""
+
+    def __init__(self, budget_seconds: float) -> None:
+        self._deadline = time.perf_counter() + max(0.0, budget_seconds)
+
+    def remaining(self) -> float:
+        return max(0.0, self._deadline - time.perf_counter())
+
+    def expired(self) -> bool:
+        return self.remaining() <= 0.0
 
 
 class POISearchService:
@@ -26,9 +41,11 @@ class POISearchService:
         *,
         overpass: OverpassClient,
         city_cache_ttl_seconds: int = DEFAULT_CITY_CACHE_TTL_SECONDS,
+        search_budget_seconds: float = DEFAULT_POI_SEARCH_BUDGET_SECONDS,
     ) -> None:
         self._overpass = overpass
         self.city_cache_ttl_seconds = max(0, int(city_cache_ttl_seconds))
+        self.search_budget_seconds = max(1.0, float(search_budget_seconds))
         # In-process session cache: one successful live lookup per (session, city, interests).
         self._session_city_cache: dict[str, dict[str, Any]] = {}
         # When every mirror fails for a specific query, skip duplicate Overpass calls.
@@ -90,6 +107,7 @@ class POISearchService:
                 )
                 return result
 
+        budget = _SearchBudget(self.search_budget_seconds)
         result = await self._live_search(
             city=city,
             interests=search_keys,
@@ -97,27 +115,43 @@ class POISearchService:
             use_cache=use_cache,
             session_key=session_key,
             query_label=",".join(search_keys) or "sightseeing",
+            budget=budget,
+            stage="combined",
         )
         pois = _dedupe_poi_dicts(list(result.get("pois") or []))
 
-        # Supplemental per-interest lookups when combined search missed a requested interest.
-        if interests_norm:
-            for interest in missing_interests(interests_norm, pois):
-                supplemental_keys = search_keys_for_interests([interest])
-                if not supplemental_keys:
-                    continue
-                extra_key = _session_cache_key(session_id, city, [interest])
-                extra = await self._live_search(
-                    city=city,
-                    interests=supplemental_keys,
-                    max_results=max(12, max_results // 2),
-                    use_cache=use_cache,
-                    session_key=extra_key,
-                    query_label=interest,
+        # Supplemental lookups only when the combined Overpass call failed. A successful
+        # combined query already searched every interest key; re-querying wastes latency.
+        combined_failed = bool(result.get("error"))
+        if interests_norm and combined_failed and not budget.expired():
+            supplemental_specs = _supplemental_search_specs(
+                interests_norm,
+                pois,
+                session_id=session_id,
+                city=city,
+            )
+            if supplemental_specs:
+                extras = await asyncio.gather(
+                    *[
+                        self._live_search(
+                            city=city,
+                            interests=spec["search_keys"],
+                            max_results=max(12, max_results // 2),
+                            use_cache=use_cache,
+                            session_key=spec["session_key"],
+                            query_label=spec["query_label"],
+                            budget=budget,
+                            stage="supplemental",
+                        )
+                        for spec in supplemental_specs
+                    ]
                 )
-                pois = _merge_poi_dicts(pois, list(extra.get("pois") or []))
-                if extra.get("live_poi_lookup"):
-                    result["live_poi_lookup"] = True
+                for extra in extras:
+                    pois = _merge_poi_dicts(pois, list(extra.get("pois") or []))
+                    if extra.get("live_poi_lookup"):
+                        result["live_poi_lookup"] = True
+                    if not result.get("error") and extra.get("error"):
+                        result["error"] = extra.get("error")
 
         result["pois"] = pois[: max(1, int(max_results))]
 
@@ -131,7 +165,7 @@ class POISearchService:
             and len(pois) < _MIN_POIS_TO_SKIP_BROADER_SEARCH
             and exhausted_key not in self._session_overpass_exhausted
         )
-        if needs_broader:
+        if needs_broader and not budget.expired():
             broader_key = _session_cache_key(session_id, city, ["sightseeing"])
             broader = await self._live_search(
                 city=city,
@@ -140,6 +174,8 @@ class POISearchService:
                 use_cache=use_cache,
                 session_key=broader_key,
                 query_label="sightseeing_fallback",
+                budget=budget,
+                stage="broader_fallback",
             )
             merged = _merge_poi_dicts(pois, list(broader.get("pois") or []))
             if merged:
@@ -164,15 +200,19 @@ class POISearchService:
         use_cache: bool,
         session_key: str | None = None,
         query_label: str = "",
+        budget: _SearchBudget | None = None,
+        stage: str = "live",
     ) -> dict[str, Any]:
         query = build_overpass_query(city=city, interests=interests)
         started = time.perf_counter()
-        exhaustion_key = _exhaustion_key(session_key, query_label or ",".join(interests))
+        label = query_label or ",".join(interests)
+        exhaustion_key = _exhaustion_key(session_key, label)
         if exhaustion_key in self._session_overpass_exhausted:
             logger.info(
-                "poi_search_skipped_exhausted city=%s query=%s",
+                "poi_search_skipped_exhausted city=%s stage=%s query=%s",
                 city,
-                query_label or interests,
+                stage,
+                label,
             )
             return {
                 "source": "osm",
@@ -182,15 +222,52 @@ class POISearchService:
                 "duration_ms": 0.0,
             }
 
+        remaining = budget.remaining() if budget is not None else None
+        if remaining is not None and remaining <= 0.0:
+            logger.warning(
+                "poi_search_budget_exceeded city=%s stage=%s query=%s reason=deadline_before_start",
+                city,
+                stage,
+                label,
+            )
+            return {
+                "source": "osm",
+                "pois": [],
+                "live_poi_lookup": False,
+                "error": "poi_search_budget_exceeded",
+                "duration_ms": 0.0,
+            }
+
         try:
-            payload = await self._overpass.run_query(query, use_cache=use_cache)
+            overpass_task = self._overpass.run_query(query, use_cache=use_cache)
+            if remaining is not None:
+                payload = await asyncio.wait_for(overpass_task, timeout=remaining)
+            else:
+                payload = await overpass_task
+        except asyncio.TimeoutError:
+            duration_ms = round((time.perf_counter() - started) * 1000, 2)
+            logger.warning(
+                "poi_search_budget_exceeded city=%s stage=%s query=%s duration_ms=%s",
+                city,
+                stage,
+                label,
+                duration_ms,
+            )
+            return {
+                "source": "osm",
+                "pois": [],
+                "live_poi_lookup": False,
+                "error": "poi_search_budget_exceeded",
+                "duration_ms": duration_ms,
+            }
         except OverpassError as exc:
             self._session_overpass_exhausted.add(exhaustion_key)
             duration_ms = round((time.perf_counter() - started) * 1000, 2)
             logger.warning(
-                "poi_search_overpass_failed city=%s query=%s duration_ms=%s error=%s",
+                "poi_search_overpass_failed city=%s stage=%s query=%s duration_ms=%s error=%s",
                 city,
-                query_label or interests,
+                stage,
+                label,
                 duration_ms,
                 str(exc)[:200],
             )
@@ -224,13 +301,15 @@ class POISearchService:
         }
 
         logger.info(
-            "poi_search_complete city=%s query=%s elements=%s poi_count=%s live=%s duration_ms=%s",
+            "poi_search_complete city=%s stage=%s query=%s elements=%s poi_count=%s live=%s duration_ms=%s budget_remaining_ms=%s",
             city,
-            query_label or interests,
+            stage,
+            label,
             len(elements),
             len(poi_dicts),
             live,
             duration_ms,
+            round((budget.remaining() * 1000), 2) if budget is not None else None,
         )
 
         if live and use_cache and self.city_cache_ttl_seconds > 0:
@@ -334,12 +413,38 @@ def _exhaustion_key(session_key: str | None, query_label: str) -> str:
     return f"{base}::{query_label}"
 
 
+def _supplemental_search_specs(
+    interests_norm: list[str],
+    pois: list[dict[str, Any]],
+    *,
+    session_id: str | None,
+    city: str,
+) -> list[dict[str, Any]]:
+    """Deduplicated supplemental lookups for interests missing after a failed combined search."""
+    specs: list[dict[str, Any]] = []
+    seen_key_sets: set[tuple[str, ...]] = set()
+    for interest in missing_interests(interests_norm, pois):
+        search_keys = tuple(search_keys_for_interests([interest]))
+        if not search_keys or search_keys in seen_key_sets:
+            continue
+        seen_key_sets.add(search_keys)
+        specs.append(
+            {
+                "search_keys": list(search_keys),
+                "query_label": interest,
+                "session_key": _session_cache_key(session_id, city, [interest]),
+            }
+        )
+    return specs
+
+
 def build_default_poi_service(
     *,
     overpass_api_url: str | None = None,
     overpass_urls: list[str] | None = None,
     cache_dir: Path,
     city_cache_ttl_seconds: int = DEFAULT_CITY_CACHE_TTL_SECONDS,
+    search_budget_seconds: float = DEFAULT_POI_SEARCH_BUDGET_SECONDS,
 ) -> POISearchService:
     urls = [u.strip() for u in (overpass_urls or []) if u and u.strip()]
     if not urls and overpass_api_url:
@@ -347,4 +452,5 @@ def build_default_poi_service(
     return POISearchService(
         overpass=OverpassClient(base_urls=urls, cache_dir=cache_dir),
         city_cache_ttl_seconds=city_cache_ttl_seconds,
+        search_budget_seconds=search_budget_seconds,
     )
