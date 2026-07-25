@@ -1,4 +1,4 @@
-"""Well-known / LLM fallback POIs when live Overpass lookup is unavailable."""
+"""Well-known / curated fallback POIs when live Overpass lookup is unavailable."""
 
 from __future__ import annotations
 
@@ -7,6 +7,44 @@ import re
 from typing import Any
 
 from src.mcp_servers.poi_search.models import POI
+from src.shared.interests import (
+    missing_interests,
+    normalize_interests,
+    poi_satisfies_interest,
+)
+
+CURATED_SOURCE = "well_known"
+LIVE_SOURCES = frozenset({"osm", "city_cache"})
+
+LIVE_POI_UNAVAILABLE_NOTE = (
+    "Live place lookup was temporarily unavailable. This itinerary uses curated "
+    "destination guidance instead of live map data."
+)
+
+UNVERIFIED_INTERESTS_NOTE = (
+    "We could not verify suitable places for: {interests}. "
+    "Those interests are not included as verified stops."
+)
+
+# LLM payloads must never contribute schedulable POIs or unverified place metadata.
+_FORBIDDEN_LLM_TAG_KEYS = frozenset(
+    {
+        "opening_hours",
+        "opening_hours:start",
+        "opening_hours:end",
+        "addr:full",
+        "addr:street",
+        "addr:housenumber",
+        "address",
+        "rating",
+        "stars",
+        "website",
+        "phone",
+        "url",
+        "contact:website",
+        "contact:phone",
+    }
+)
 
 # Stable synthetic ids so itinerary builder / registry stay consistent across runs.
 WELL_KNOWN_BY_CITY: dict[str, list[POI]] = {
@@ -16,7 +54,7 @@ WELL_KNOWN_BY_CITY: dict[str, list[POI]] = {
             name="City Palace",
             lat=26.9258,
             lon=75.8236,
-            source="well_known",
+            source=CURATED_SOURCE,
             category="culture",
         ),
         POI(
@@ -24,7 +62,7 @@ WELL_KNOWN_BY_CITY: dict[str, list[POI]] = {
             name="Hawa Mahal",
             lat=26.9239,
             lon=75.8267,
-            source="well_known",
+            source=CURATED_SOURCE,
             category="landmark",
         ),
         POI(
@@ -32,7 +70,7 @@ WELL_KNOWN_BY_CITY: dict[str, list[POI]] = {
             name="Amber Fort",
             lat=26.9855,
             lon=75.8513,
-            source="well_known",
+            source=CURATED_SOURCE,
             category="landmark",
         ),
         POI(
@@ -40,7 +78,7 @@ WELL_KNOWN_BY_CITY: dict[str, list[POI]] = {
             name="Jantar Mantar",
             lat=26.9247,
             lon=75.8246,
-            source="well_known",
+            source=CURATED_SOURCE,
             category="culture",
         ),
         POI(
@@ -48,7 +86,7 @@ WELL_KNOWN_BY_CITY: dict[str, list[POI]] = {
             name="Jal Mahal",
             lat=26.9535,
             lon=75.8463,
-            source="well_known",
+            source=CURATED_SOURCE,
             category="landmark",
         ),
         POI(
@@ -56,7 +94,7 @@ WELL_KNOWN_BY_CITY: dict[str, list[POI]] = {
             name="Bapu Bazaar",
             lat=26.9170,
             lon=75.8205,
-            source="well_known",
+            source=CURATED_SOURCE,
             category="shopping",
         ),
         POI(
@@ -64,7 +102,7 @@ WELL_KNOWN_BY_CITY: dict[str, list[POI]] = {
             name="Laxmi Misthan Bhandar (LMB)",
             lat=26.9190,
             lon=75.8265,
-            source="well_known",
+            source=CURATED_SOURCE,
             category="food",
         ),
         POI(
@@ -72,7 +110,7 @@ WELL_KNOWN_BY_CITY: dict[str, list[POI]] = {
             name="Indian Coffee House",
             lat=26.9152,
             lon=75.8189,
-            source="well_known",
+            source=CURATED_SOURCE,
             category="food",
         ),
         POI(
@@ -80,7 +118,7 @@ WELL_KNOWN_BY_CITY: dict[str, list[POI]] = {
             name="Peacock Rooftop Restaurant",
             lat=26.9245,
             lon=75.8260,
-            source="well_known",
+            source=CURATED_SOURCE,
             category="food",
         ),
         POI(
@@ -88,7 +126,7 @@ WELL_KNOWN_BY_CITY: dict[str, list[POI]] = {
             name="Rawat Misthan Bhandar",
             lat=26.9128,
             lon=75.7878,
-            source="well_known",
+            source=CURATED_SOURCE,
             category="food",
         ),
         POI(
@@ -96,8 +134,24 @@ WELL_KNOWN_BY_CITY: dict[str, list[POI]] = {
             name="Chokhi Dhani",
             lat=26.7665,
             lon=75.8360,
-            source="well_known",
+            source=CURATED_SOURCE,
             category="food",
+        ),
+        POI(
+            osm_id="well_known/jaipur-jhalana-safari",
+            name="Jhalana Leopard Safari Park",
+            lat=26.8712,
+            lon=75.8294,
+            source=CURATED_SOURCE,
+            category="adventure",
+        ),
+        POI(
+            osm_id="well_known/jaipur-nahargarh-fort",
+            name="Nahargarh Fort",
+            lat=26.9388,
+            lon=75.8155,
+            source=CURATED_SOURCE,
+            category="adventure",
         ),
     ],
 }
@@ -107,70 +161,85 @@ WELL_KNOWN_BY_CITY: dict[str, list[POI]] = {
 _DINING_CATEGORIES = frozenset({"food"})
 
 
-def well_known_pois_for_city(city: str, *, interests: list[str] | None = None) -> list[dict[str, Any]]:
-    """Return curated attractions for a city, optionally filtered by interest category.
-
-    Food POIs stay in the catalog for recommendations, but are excluded from the
-    default sightseeing set unless ``interests`` explicitly includes ``food``.
-    """
+def has_curated_catalog(city: str) -> bool:
     key = (city or "").strip().lower()
-    pois = list(WELL_KNOWN_BY_CITY.get(key) or _generic_city_pois(city))
-    interests_norm = [i.strip().lower() for i in (interests or []) if i and i.strip()]
-    if "food" not in interests_norm:
-        pois = [
-            p for p in pois if (p.category or "").lower() not in _DINING_CATEGORIES
-        ]
-    if interests_norm:
-        matched = [
-            p
-            for p in pois
-            if p.category and p.category.lower() in interests_norm
-        ]
-        if matched:
-            pois = matched + [p for p in pois if p not in matched]
-    return [p.model_dump() for p in pois]
+    return bool(WELL_KNOWN_BY_CITY.get(key))
 
 
-def _generic_city_pois(city: str) -> list[POI]:
-    """Minimal placeholders when no curated catalog exists for the city."""
-    slug = re.sub(r"[^a-z0-9]+", "-", (city or "destination").strip().lower()).strip("-") or "city"
-    label = (city or "Destination").strip() or "Destination"
-    # Neutral coords near Jaipur for Phase 1 demos; scheduler still needs lat/lon.
+def is_live_poi(poi: dict[str, Any]) -> bool:
+    return str(poi.get("source") or "").strip().lower() in LIVE_SOURCES
+
+
+def is_curated_poi(poi: dict[str, Any]) -> bool:
+    return str(poi.get("source") or "").strip().lower() == CURATED_SOURCE
+
+
+def curated_pois_for_city(city: str, *, interests: list[str] | None = None) -> list[dict[str, Any]]:
+    """Return only explicit curated-catalog POIs for a city (never generic placeholders)."""
+    key = (city or "").strip().lower()
+    pois = list(WELL_KNOWN_BY_CITY.get(key) or [])
+    return _filter_curated_pois(pois, interests)
+
+
+def well_known_pois_for_city(city: str, *, interests: list[str] | None = None) -> list[dict[str, Any]]:
+    """Return curated attractions for a city, optionally filtered by interest category."""
+    return curated_pois_for_city(city, interests=interests)
+
+
+def missing_curated_interests(city: str, interests: list[str] | None) -> list[str]:
+    """Interests with no matching curated POI for the city."""
+    catalog = curated_pois_for_city(city, interests=interests)
+    return missing_interests(interests, catalog)
+
+
+def curated_for_missing_interests(
+    city: str,
+    *,
+    interests: list[str] | None,
+    existing_pois: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return curated POIs only for requested interests not already represented."""
+    gaps = missing_interests(interests, existing_pois)
+    if not gaps:
+        return []
+    catalog = curated_pois_for_city(city, interests=gaps)
     return [
-        POI(
-            osm_id=f"well_known/{slug}-historic-center",
-            name=f"{label} Historic Center",
-            lat=26.9124,
-            lon=75.7873,
-            source="well_known",
-            category="landmark",
-        ),
-        POI(
-            osm_id=f"well_known/{slug}-main-market",
-            name=f"{label} Main Market",
-            lat=26.9180,
-            lon=75.7950,
-            source="well_known",
-            category="shopping",
-        ),
-        POI(
-            osm_id=f"well_known/{slug}-local-museum",
-            name=f"{label} Museum",
-            lat=26.9200,
-            lon=75.8000,
-            source="well_known",
-            category="culture",
-        ),
+        poi
+        for poi in catalog
+        if any(poi_satisfies_interest(poi, interest) for interest in gaps)
     ]
 
 
+def merge_live_and_curated_pois(
+    live_pois: list[dict[str, Any]],
+    curated_pois: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Preserve verified live POIs and add non-duplicative curated entries."""
+    merged = list(live_pois)
+    seen_ids = {str(p.get("osm_id") or p.get("poi_id") or "") for p in merged}
+    seen_names = {str(p.get("name") or "").strip().lower() for p in merged}
+    for poi in curated_pois:
+        poi_id = str(poi.get("osm_id") or poi.get("poi_id") or "")
+        name = str(poi.get("name") or "").strip().lower()
+        if poi_id and poi_id in seen_ids:
+            continue
+        if name and name in seen_names:
+            continue
+        merged.append(poi)
+        if poi_id:
+            seen_ids.add(poi_id)
+        if name:
+            seen_names.add(name)
+    return merged
+
+
 def parse_llm_pois_payload(content: str, *, city: str) -> list[dict[str, Any]]:
-    """Best-effort parse of an LLM JSON list of POIs. Returns [] on failure."""
+    """Reject LLM POI payloads for scheduling — they may invent places or coordinates."""
+    _ = city
     if not content or "[stub response" in content:
         return []
 
     text = content.strip()
-    # Allow fenced JSON blocks.
     fence = re.search(r"```(?:json)?\s*(\[.*?\])\s*```", text, re.DOTALL | re.IGNORECASE)
     if fence:
         text = fence.group(1)
@@ -188,29 +257,43 @@ def parse_llm_pois_payload(content: str, *, city: str) -> list[dict[str, Any]]:
     if not isinstance(raw, list):
         return []
 
-    slug = re.sub(r"[^a-z0-9]+", "-", city.strip().lower()).strip("-") or "city"
-    pois: list[dict[str, Any]] = []
-    for index, item in enumerate(raw, start=1):
-        if not isinstance(item, dict):
-            continue
-        name = str(item.get("name") or "").strip()
-        if not name:
-            continue
-        try:
-            lat = float(item["lat"])
-            lon = float(item["lon"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        poi_id = str(item.get("osm_id") or item.get("poi_id") or f"llm/{slug}-{index}")
-        pois.append(
-            {
-                "osm_id": poi_id,
-                "name": name,
-                "lat": lat,
-                "lon": lon,
-                "source": "llm",
-                "category": item.get("category"),
-                "tags": dict(item.get("tags") or {}),
-            }
-        )
-    return pois
+    # Safety policy: never schedule LLM-generated places or coordinates.
+    return []
+
+
+def _filter_curated_pois(pois: list[POI], interests: list[str] | None) -> list[dict[str, Any]]:
+    interests_norm = normalize_interests(interests)
+    if "food" not in interests_norm:
+        pois = [
+            p for p in pois if (p.category or "").lower() not in _DINING_CATEGORIES
+        ]
+    if interests_norm:
+        matched = [
+            p
+            for p in pois
+            if any(
+                poi_satisfies_interest(p.model_dump(), interest) for interest in interests_norm
+            )
+        ]
+        if matched:
+            pois = matched + [p for p in pois if p not in matched]
+    return [_sanitize_curated_poi(p.model_dump()) for p in pois]
+
+
+def _sanitize_curated_poi(poi: dict[str, Any]) -> dict[str, Any]:
+    tags = {
+        key: value
+        for key, value in dict(poi.get("tags") or {}).items()
+        if key not in _FORBIDDEN_LLM_TAG_KEYS
+    }
+    return {
+        "osm_id": poi.get("osm_id"),
+        "name": poi.get("name"),
+        "lat": poi.get("lat"),
+        "lon": poi.get("lon"),
+        "source": CURATED_SOURCE,
+        "category": poi.get("category"),
+        "tags": tags,
+        "verified_live": False,
+        "catalog": "curated",
+    }

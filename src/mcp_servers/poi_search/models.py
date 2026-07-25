@@ -20,6 +20,43 @@ class POI(BaseModel):
     tags: dict[str, Any] = Field(default_factory=dict)
 
 
+def infer_category_from_tags(tags: dict[str, Any]) -> str | None:
+    """Best-effort POI category from OSM tags."""
+    amenity = str(tags.get("amenity") or "").lower()
+    tourism = str(tags.get("tourism") or "").lower()
+    leisure = str(tags.get("leisure") or "").lower()
+    shop = tags.get("shop")
+    natural = tags.get("natural")
+    sport = tags.get("sport")
+    historic = tags.get("historic")
+
+    if amenity in {"restaurant", "cafe", "fast_food", "food_court", "biergarten"}:
+        return "food"
+    if amenity in {"bar", "pub", "nightclub"}:
+        return "nightlife"
+    if tourism in {"museum", "gallery", "artwork"} or amenity == "theatre":
+        return "culture"
+    if shop is not None or amenity == "marketplace":
+        return "shopping"
+    if leisure in {"park", "nature_reserve", "playground"} or natural:
+        return "nature"
+    if leisure in {"sports_centre", "track"} or sport:
+        return "adventure"
+    if tourism in {"zoo", "theme_park", "aquarium"}:
+        return "family"
+    if tourism in {"theme_park"} or (
+        tourism == "attraction"
+        and any(
+            token in str(tags.get("attraction") or "").lower()
+            for token in ("hiking", "climbing", "adventure", "safari", "zip", "trek")
+        )
+    ):
+        return "adventure"
+    if historic or tourism in {"attraction", "viewpoint"}:
+        return "landmark"
+    return None
+
+
 def osm_element_to_poi(element: dict[str, Any], *, category: str | None = None) -> POI | None:
     """Convert an Overpass `element` to a normalized POI.
 
@@ -46,13 +83,15 @@ def osm_element_to_poi(element: dict[str, Any], *, category: str | None = None) 
     if lat is None or lon is None:
         return None
 
+    resolved_category = category or infer_category_from_tags(tags)
+
     return POI(
         osm_id=f"{el_type}/{el_id}",
         name=str(name),
         lat=float(lat),
         lon=float(lon),
         source="osm",
-        category=category,
+        category=resolved_category,
         tags=dict(tags),
     )
 

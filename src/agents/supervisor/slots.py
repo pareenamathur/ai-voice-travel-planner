@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from src.shared.interests import INTEREST_KEYWORDS, extract_interests_from_text, normalize_interests
 from src.shared.messages.types import TripConstraints
 
 # Known demo cities (case-insensitive). Extend as corpus grows.
@@ -25,24 +26,6 @@ KNOWN_CITIES = (
     "kolkata",
     "pune",
 )
-
-INTEREST_KEYWORDS: dict[str, str] = {
-    "food": "food",
-    "cuisine": "food",
-    "culinary": "food",
-    "culture": "culture",
-    "cultural": "culture",
-    "heritage": "culture",
-    "history": "culture",
-    "museum": "culture",
-    "shopping": "shopping",
-    "nature": "nature",
-    "park": "nature",
-    "sightseeing": "sightseeing",
-    "temple": "sightseeing",
-    "fort": "sightseeing",
-    "palace": "sightseeing",
-}
 
 PACE_KEYWORDS: dict[str, str] = {
     "relaxed": "relaxed",
@@ -126,7 +109,7 @@ def extract_slots(message: str) -> dict[str, Any]:
     if days is not None:
         extracted["days"] = days
 
-    interests = _extract_keywords(lower, INTEREST_KEYWORDS)
+    interests = extract_interests_from_text(text)
     if interests:
         extracted["interests"] = interests
 
@@ -173,6 +156,8 @@ def merge_constraints(
             for item in prior + list(update[list_field]):
                 if item not in merged:
                     merged.append(item)
+            if list_field == "interests":
+                merged = normalize_interests(merged)
             update[list_field] = merged
 
     return existing.model_copy(update=update)

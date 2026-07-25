@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import time
 from pathlib import Path
@@ -11,6 +12,9 @@ from typing import Any
 from src.mcp_servers.poi_search.models import POI, osm_element_to_poi
 from src.mcp_servers.poi_search.overpass import OverpassClient, OverpassError
 from src.mcp_servers.poi_search.queries import INTEREST_MAP, build_overpass_query
+from src.shared.interests import missing_interests, normalize_interests, search_keys_for_interests
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_CITY_CACHE_TTL_SECONDS = 24 * 3600
 _MIN_POIS_TO_SKIP_BROADER_SEARCH = 6
@@ -25,9 +29,9 @@ class POISearchService:
     ) -> None:
         self._overpass = overpass
         self.city_cache_ttl_seconds = max(0, int(city_cache_ttl_seconds))
-        # In-process session cache: one successful live lookup per (session, city).
+        # In-process session cache: one successful live lookup per (session, city, interests).
         self._session_city_cache: dict[str, dict[str, Any]] = {}
-        # When every mirror fails for a session+city, skip duplicate Overpass calls.
+        # When every mirror fails for a specific query, skip duplicate Overpass calls.
         self._session_overpass_exhausted: set[str] = set()
 
     async def search_pois(
@@ -47,14 +51,21 @@ class POISearchService:
         - `live_poi_lookup`: True when non-empty live/cached OSM results are returned
         """
 
-        interests = interests or []
-        city_key = _city_cache_key(city, interests)
-        session_key = _session_cache_key(session_id, city)
+        interests_norm = normalize_interests(interests)
+        search_keys = search_keys_for_interests(interests_norm)
+        city_key = _city_cache_key(city, interests_norm)
+        session_key = _session_cache_key(session_id, city, interests_norm)
 
         if session_key and session_key in self._session_city_cache:
             cached = self._session_city_cache[session_key]
             pois = list(cached.get("pois") or [])[: max(1, int(max_results))]
             if pois:
+                logger.info(
+                    "poi_search_session_cache_hit city=%s interests=%s poi_count=%s",
+                    city,
+                    interests_norm,
+                    len(pois),
+                )
                 return {
                     "source": cached.get("source", "osm"),
                     "pois": pois,
@@ -71,37 +82,76 @@ class POISearchService:
                     "live_poi_lookup": True,
                 }
                 self._remember_session(session_key, result)
+                logger.info(
+                    "poi_search_city_cache_hit city=%s interests=%s poi_count=%s",
+                    city,
+                    interests_norm,
+                    len(pois),
+                )
                 return result
 
         result = await self._live_search(
             city=city,
-            interests=interests,
+            interests=search_keys,
             max_results=max_results,
             use_cache=use_cache,
             session_key=session_key,
+            query_label=",".join(search_keys) or "sightseeing",
         )
+        pois = _dedupe_poi_dicts(list(result.get("pois") or []))
+
+        # Supplemental per-interest lookups when combined search missed a requested interest.
+        if interests_norm:
+            for interest in missing_interests(interests_norm, pois):
+                supplemental_keys = search_keys_for_interests([interest])
+                if not supplemental_keys:
+                    continue
+                extra_key = _session_cache_key(session_id, city, [interest])
+                extra = await self._live_search(
+                    city=city,
+                    interests=supplemental_keys,
+                    max_results=max(12, max_results // 2),
+                    use_cache=use_cache,
+                    session_key=extra_key,
+                    query_label=interest,
+                )
+                pois = _merge_poi_dicts(pois, list(extra.get("pois") or []))
+                if extra.get("live_poi_lookup"):
+                    result["live_poi_lookup"] = True
+
+        result["pois"] = pois[: max(1, int(max_results))]
+
         if result.get("live_poi_lookup") and result.get("pois"):
             self._remember_session(session_key, result)
             return result
 
-        pois = list(result.get("pois") or [])
-        exhausted = session_key and session_key in self._session_overpass_exhausted
+        exhausted_key = _exhaustion_key(session_key, "sightseeing")
         needs_broader = (
-            interests
+            interests_norm
             and len(pois) < _MIN_POIS_TO_SKIP_BROADER_SEARCH
-            and not exhausted
+            and exhausted_key not in self._session_overpass_exhausted
         )
         if needs_broader:
+            broader_key = _session_cache_key(session_id, city, ["sightseeing"])
             broader = await self._live_search(
                 city=city,
                 interests=["sightseeing"],
                 max_results=max_results,
                 use_cache=use_cache,
-                session_key=session_key,
+                session_key=broader_key,
+                query_label="sightseeing_fallback",
             )
-            if broader.get("live_poi_lookup") and broader.get("pois"):
-                self._remember_session(session_key, broader)
-                return broader
+            merged = _merge_poi_dicts(pois, list(broader.get("pois") or []))
+            if merged:
+                result = {
+                    **result,
+                    "pois": merged[: max(1, int(max_results))],
+                    "live_poi_lookup": bool(broader.get("live_poi_lookup") or result.get("live_poi_lookup")),
+                    "source": broader.get("source") or result.get("source") or "osm",
+                }
+                if result.get("live_poi_lookup"):
+                    self._remember_session(session_key, result)
+                    return result
 
         return result
 
@@ -113,55 +163,75 @@ class POISearchService:
         max_results: int,
         use_cache: bool,
         session_key: str | None = None,
+        query_label: str = "",
     ) -> dict[str, Any]:
         query = build_overpass_query(city=city, interests=interests)
         started = time.perf_counter()
+        exhaustion_key = _exhaustion_key(session_key, query_label or ",".join(interests))
+        if exhaustion_key in self._session_overpass_exhausted:
+            logger.info(
+                "poi_search_skipped_exhausted city=%s query=%s",
+                city,
+                query_label or interests,
+            )
+            return {
+                "source": "osm",
+                "pois": [],
+                "live_poi_lookup": False,
+                "error": "overpass_exhausted_for_query",
+                "duration_ms": 0.0,
+            }
+
         try:
             payload = await self._overpass.run_query(query, use_cache=use_cache)
         except OverpassError as exc:
-            if session_key:
-                self._session_overpass_exhausted.add(session_key)
+            self._session_overpass_exhausted.add(exhaustion_key)
+            duration_ms = round((time.perf_counter() - started) * 1000, 2)
+            logger.warning(
+                "poi_search_overpass_failed city=%s query=%s duration_ms=%s error=%s",
+                city,
+                query_label or interests,
+                duration_ms,
+                str(exc)[:200],
+            )
             return {
                 "source": "osm",
                 "pois": [],
                 "live_poi_lookup": False,
                 "error": str(exc)[:300],
-                "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+                "duration_ms": duration_ms,
             }
 
         elements = payload.get("elements") or []
         pois: list[POI] = []
 
-        category: str | None = None
-        for interest in interests:
-            mapped = INTEREST_MAP.get(interest.strip().lower())
-            if mapped:
-                category = mapped.category
-                break
-
         for el in elements:
-            poi = osm_element_to_poi(el, category=category)
+            poi = osm_element_to_poi(el)
             if poi:
                 pois.append(poi)
 
-        seen: set[str] = set()
-        unique: list[POI] = []
-        for poi in pois:
-            if poi.osm_id in seen:
-                continue
-            seen.add(poi.osm_id)
-            unique.append(poi)
-
+        unique = _dedupe_pois(pois)
         unique = unique[: max(1, int(max_results))]
         poi_dicts = [p.model_dump() for p in unique]
         live = bool(poi_dicts)
+        duration_ms = round((time.perf_counter() - started) * 1000, 2)
         result = {
             "source": "osm",
             "pois": poi_dicts,
             "live_poi_lookup": live,
-            "duration_ms": round((time.perf_counter() - started) * 1000, 2),
+            "duration_ms": duration_ms,
             "element_count": len(elements),
         }
+
+        logger.info(
+            "poi_search_complete city=%s query=%s elements=%s poi_count=%s live=%s duration_ms=%s",
+            city,
+            query_label or interests,
+            len(elements),
+            len(poi_dicts),
+            live,
+            duration_ms,
+        )
 
         if live and use_cache and self.city_cache_ttl_seconds > 0:
             city_key = _city_cache_key(city, interests)
@@ -207,23 +277,61 @@ class POISearchService:
         )
 
 
+def _dedupe_pois(pois: list[POI]) -> list[POI]:
+    seen: set[str] = set()
+    unique: list[POI] = []
+    for poi in pois:
+        if poi.osm_id in seen:
+            continue
+        seen.add(poi.osm_id)
+        unique.append(poi)
+    return unique
+
+
+def _dedupe_poi_dicts(pois: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    unique: list[dict[str, Any]] = []
+    for poi in pois:
+        poi_id = str(poi.get("osm_id") or poi.get("poi_id") or "")
+        if not poi_id or poi_id in seen:
+            continue
+        seen.add(poi_id)
+        unique.append(poi)
+    return unique
+
+
+def _merge_poi_dicts(
+    primary: list[dict[str, Any]],
+    secondary: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    return _dedupe_poi_dicts([*primary, *secondary])
+
+
 def _city_cache_key(city: str, interests: list[str] | None = None) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", (city or "").strip().lower()).strip("-")
     city_part = slug or "unknown"
-    interests_norm = sorted(
-        {i.strip().lower() for i in (interests or []) if i and i.strip()}
-    )
+    interests_norm = sorted(normalize_interests(interests))
     if not interests_norm:
         return f"{city_part}__sightseeing"
     interest_part = "-".join(interests_norm)
     return f"{city_part}__{interest_part}"
 
 
-def _session_cache_key(session_id: str | None, city: str) -> str | None:
+def _session_cache_key(
+    session_id: str | None,
+    city: str,
+    interests: list[str] | None = None,
+) -> str | None:
     if not session_id or not str(session_id).strip():
         return None
     slug = re.sub(r"[^a-z0-9]+", "-", (city or "").strip().lower()).strip("-")
-    return f"{session_id.strip()}::{slug or 'unknown'}"
+    interests_norm = "-".join(sorted(normalize_interests(interests))) or "sightseeing"
+    return f"{session_id.strip()}::{slug or 'unknown'}::{interests_norm}"
+
+
+def _exhaustion_key(session_key: str | None, query_label: str) -> str:
+    base = session_key or "global"
+    return f"{base}::{query_label}"
 
 
 def build_default_poi_service(
