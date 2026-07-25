@@ -3,7 +3,13 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0.35rem;
+  gap: 0.5rem;
+}
+
+.export-menu__actions {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .export-menu__trigger {
@@ -86,4 +92,52 @@
 
 .export-toast--error {
   color: #ffb4a8;
+}
+
+.export-menu__email {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  width: 100%;
+  max-width: 18rem;
+}
+
+.export-menu__email-input {
+  flex: 1 1 9rem;
+  min-width: 0;
+  padding: 0.45rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--on-surface, #e5e2e1);
+  font-size: 0.82rem;
+}
+
+.export-menu__email-input:disabled {
+  opacity: 0.6;
+}
+
+.export-menu__email-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 185, 97, 0.35);
+  background: rgba(255, 185, 97, 0.12);
+  color: var(--on-surface, #e5e2e1);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.export-menu__email-btn:hover:not(:disabled) {
+  background: rgba(255, 185, 97, 0.2);
+}
+
+.export-menu__email-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }

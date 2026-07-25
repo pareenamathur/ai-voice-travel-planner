@@ -5,7 +5,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from src.agents.planning.errors import PlanningFailedError
 from src.agents.registry import AgentRegistry
@@ -39,6 +39,16 @@ class SessionMessageRequest(BaseModel):
 class SessionExportRequest(BaseModel):
     session_id: str = Field(..., min_length=1)
     format: Literal["pdf", "markdown", "json"] = "pdf"
+
+
+class SessionExportEmailRequest(BaseModel):
+    session_id: str = Field(..., min_length=1)
+    email: EmailStr
+
+
+class SessionExportEmailResponse(BaseModel):
+    success: bool = True
+    message: str = "Itinerary emailed successfully"
 
 
 class SessionMessageResponse(BaseModel):
@@ -104,6 +114,24 @@ async def session_export(
         content=outcome["content"],
         media_type=str(outcome.get("media_type") or "application/octet-stream"),
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/session/export/email", response_model=SessionExportEmailResponse)
+async def session_export_email(
+    body: SessionExportEmailRequest,
+    registry: AgentRegistry = Depends(get_registry),
+) -> SessionExportEmailResponse:
+    """Email an approved itinerary PDF via n8n."""
+    outcome = await registry.supervisor.handle_export_email(
+        body.session_id,
+        str(body.email),
+    )
+    if outcome.get("error"):
+        raise HTTPException(status_code=400, detail=str(outcome["error"]))
+    return SessionExportEmailResponse(
+        success=bool(outcome.get("success", True)),
+        message=str(outcome.get("message") or "Itinerary emailed successfully"),
     )
 
 

@@ -54,6 +54,14 @@ def _mock_n8n_webhook(monkeypatch):
         _fake_n8n,
     )
 
+    async def _fake_n8n_email(**kwargs):
+        return {"success": True, "message": "Itinerary emailed successfully"}
+
+    monkeypatch.setattr(
+        "src.mcp_servers.export.n8n_client.invoke_n8n_export_email",
+        _fake_n8n_email,
+    )
+
 
 def test_export_rejected_when_not_approved():
     registry = get_registry()
@@ -93,3 +101,61 @@ def test_export_markdown_when_approved():
     assert "text/markdown" in response.headers["content-type"]
     assert b"Amber Fort" in response.content
     assert "attachment" in response.headers.get("content-disposition", "")
+
+
+def test_export_email_rejected_when_not_approved():
+    registry = get_registry()
+    session = registry.session_manager.create()
+    registry.session_manager.set_itinerary(
+        session.session_id,
+        _ITINERARY,
+        poi_registry={},
+        rag_citations=[],
+    )
+    registry.session_manager.set_itinerary_approved(session.session_id, False)
+
+    response = client.post(
+        "/api/session/export/email",
+        json={"session_id": session.session_id, "email": "traveler@example.com"},
+    )
+    assert response.status_code == 400
+    assert "isn't approved yet" in response.json()["detail"]
+
+
+def test_export_email_success_when_approved():
+    registry = get_registry()
+    session = registry.session_manager.create()
+    registry.session_manager.set_itinerary(
+        session.session_id,
+        _ITINERARY,
+        poi_registry={},
+        rag_citations=[],
+    )
+    registry.session_manager.set_itinerary_approved(session.session_id, True)
+
+    response = client.post(
+        "/api/session/export/email",
+        json={"session_id": session.session_id, "email": "traveler@example.com"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert "emailed" in payload["message"].lower()
+
+
+def test_export_email_rejects_invalid_email():
+    registry = get_registry()
+    session = registry.session_manager.create()
+    registry.session_manager.set_itinerary(
+        session.session_id,
+        _ITINERARY,
+        poi_registry={},
+        rag_citations=[],
+    )
+    registry.session_manager.set_itinerary_approved(session.session_id, True)
+
+    response = client.post(
+        "/api/session/export/email",
+        json={"session_id": session.session_id, "email": "not-an-email"},
+    )
+    assert response.status_code == 422

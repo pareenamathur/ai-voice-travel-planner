@@ -74,3 +74,58 @@ async def invoke_n8n_export(
         "trip_title": data.get("trip_title", trip_title),
         "generated_at": data.get("generated_at"),
     }
+
+
+async def invoke_n8n_export_email(
+    *,
+    itinerary: dict[str, Any],
+    recipient_email: str,
+    trip_title: str | None = None,
+    rag_citations: list[dict[str, Any]] | None = None,
+    timeout_seconds: float = 90.0,
+) -> dict[str, Any]:
+    """POST email-delivery export job to n8n; expect ``{ success: true, message }``."""
+    url = (settings.n8n_export_webhook_url or "").strip()
+    if not url:
+        raise ExportWebhookError(
+            "N8N_EXPORT_WEBHOOK_URL is not configured. "
+            "Import workflows/export_itinerary_http.json and set the webhook URL."
+        )
+
+    payload = {
+        "delivery": "email",
+        "recipient_email": recipient_email,
+        "itinerary": itinerary,
+        "export_format": "pdf",
+        "trip_title": trip_title,
+        "rag_citations": rag_citations or [],
+    }
+
+    async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+        try:
+            response = await client.post(url, json=payload)
+        except httpx.HTTPError as exc:
+            raise ExportWebhookError(f"n8n export webhook request failed: {exc}") from exc
+
+    if response.status_code >= 400:
+        detail = response.text[:500]
+        raise ExportWebhookError(
+            f"n8n export webhook returned HTTP {response.status_code}: {detail}"
+        )
+
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise ExportWebhookError("n8n export webhook returned non-JSON body") from exc
+
+    if not isinstance(data, dict):
+        raise ExportWebhookError("n8n export webhook response must be a JSON object")
+
+    if not data.get("success"):
+        message = str(data.get("message") or data.get("error") or "Email delivery failed")
+        raise ExportWebhookError(message)
+
+    return {
+        "success": True,
+        "message": str(data.get("message") or "Itinerary emailed successfully"),
+    }
