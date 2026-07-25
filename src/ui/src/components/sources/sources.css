@@ -157,6 +157,30 @@
   color: var(--on-surface, #e5e2e1);
 }
 
+.place-source-status {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--on-surface-variant, #d4c0d7);
+  line-height: 1.45;
+}
+
+.place-source-status__label {
+  font-weight: 600;
+  color: var(--on-surface, #e5e2e1);
+}
+
+.place-source-status__value {
+  color: var(--on-surface, #e5e2e1);
+}
+
+.place-source-status__hint {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  color: var(--on-surface-variant, #d4c0d7);
+  opacity: 0.85;
+}
+
 .itinerary-view__sources.source-links {
   margin-top: 1rem;
   padding-top: 1rem;

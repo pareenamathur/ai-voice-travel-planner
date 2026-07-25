@@ -105,6 +105,7 @@ class EditAgent(BaseAgent):
             day_number=day_number,
             city=str(itinerary.get("city") or task.payload.get("city") or ""),
             correlation_id=correlation_id,
+            session_id=task.session_id,
         )
 
         scope = EditScope(
@@ -142,6 +143,7 @@ class EditAgent(BaseAgent):
         day_number: int,
         city: str,
         correlation_id: str,
+        session_id: str | None,
     ) -> tuple[dict[str, Any], int]:
         assert self.gateway is not None
 
@@ -152,6 +154,7 @@ class EditAgent(BaseAgent):
                 target_name=parsed.target_name,
                 dest_day=day_number,
                 correlation_id=correlation_id,
+                session_id=session_id,
             )
             return updated, day_number
 
@@ -223,6 +226,7 @@ class EditAgent(BaseAgent):
                     before_snapshot=before_snapshot,
                     traveler_constraints=traveler_constraints,
                     correlation_id=correlation_id,
+                    session_id=session_id,
                 )
                 return updated, day_number
             replacement_pois = _optimize_travel_order(day_pois)
@@ -240,6 +244,7 @@ class EditAgent(BaseAgent):
             traveler_constraints=traveler_constraints,
             correlation_id=correlation_id,
             action=parsed.action,
+            session_id=session_id,
         )
         _assert_unchanged_days(before_snapshot, updated, edited_day=day_number)
         return updated, day_number
@@ -252,6 +257,7 @@ class EditAgent(BaseAgent):
         target_name: str | None,
         dest_day: int,
         correlation_id: str,
+        session_id: str | None,
     ) -> dict[str, Any]:
         model = Itinerary.model_validate(itinerary)
         registry = {ref.poi_id: ref for ref in model.poi_registry}
@@ -275,6 +281,7 @@ class EditAgent(BaseAgent):
             traveler_constraints=constraints,
             correlation_id=correlation_id,
             action="move_location",
+            session_id=session_id,
         )
         updated = await self._rebuild_day(
             itinerary=updated,
@@ -283,6 +290,7 @@ class EditAgent(BaseAgent):
             traveler_constraints=constraints,
             correlation_id=correlation_id,
             action="move_location",
+            session_id=session_id,
         )
         _assert_unchanged_except(before_snapshot, updated, {source_day_number, dest_day})
         return updated
@@ -294,6 +302,7 @@ class EditAgent(BaseAgent):
         before_snapshot: dict[str, Any],
         traveler_constraints: dict[str, Any],
         correlation_id: str,
+        session_id: str | None,
     ) -> dict[str, Any]:
         model = Itinerary.model_validate(itinerary)
         registry = {ref.poi_id: ref for ref in model.poi_registry}
@@ -311,6 +320,7 @@ class EditAgent(BaseAgent):
                     traveler_constraints=traveler_constraints,
                     correlation_id=correlation_id,
                     action="reduce_travel",
+                    session_id=session_id,
                 )
         if not touched:
             # Still rebuild day 1 so Review sees a scoped edit attempt with same POIs reordered.
@@ -322,6 +332,7 @@ class EditAgent(BaseAgent):
                 traveler_constraints=traveler_constraints,
                 correlation_id=correlation_id,
                 action="reduce_travel",
+                session_id=session_id,
             )
             touched.add(day1)
         _assert_unchanged_except(before_snapshot, updated, touched)
@@ -336,6 +347,7 @@ class EditAgent(BaseAgent):
         traveler_constraints: dict[str, Any],
         correlation_id: str,
         action: str,
+        session_id: str | None = None,
     ) -> dict[str, Any]:
         assert self.gateway is not None
         self._trace(
@@ -355,6 +367,7 @@ class EditAgent(BaseAgent):
                 "traveler_constraints": traveler_constraints,
             },
             correlation_id=correlation_id,
+            session_id=session_id,
         )
         if not isinstance(result, dict) or "itinerary" not in result:
             raise ValueError("rebuild_day must return an itinerary payload")

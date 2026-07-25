@@ -10,6 +10,15 @@ import {
   sparseCitationsItinerary,
 } from "./fixtures";
 
+const curatedItinerary = {
+  ...multipleCitationsItinerary,
+  metadata: {
+    live_poi_lookup: false,
+    live_poi_count: 0,
+    curated_poi_count: 2,
+  },
+};
+
 describe("SourcesPanel", () => {
   it("renders empty state when there are no citations", () => {
     render(<SourcesPanel itinerary={emptyCitationsItinerary} />);
@@ -98,6 +107,18 @@ describe("SourcesPanel", () => {
     expect(first).toHaveAttribute("target", "_blank");
     expect(first).toHaveAttribute("rel", expect.stringContaining("noopener"));
     expect(first.tagName).toBe("A");
+  });
+
+  it("renders curated place source status in the panel", () => {
+    render(<SourcesPanel itinerary={curatedItinerary} />);
+
+    expect(screen.getByTestId("sources-place-status")).toHaveAttribute(
+      "data-kind",
+      "curated",
+    );
+    expect(screen.getByTestId("sources-place-status")).toHaveTextContent(
+      "Curated recommendations",
+    );
   });
 
   it("accepts an explicit citations prop without an itinerary", () => {

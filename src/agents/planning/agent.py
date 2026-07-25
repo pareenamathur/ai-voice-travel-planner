@@ -70,7 +70,12 @@ class PlanningAgent(BaseAgent):
             poi_count=len(pois),
             interests=list(constraints.interests or []),
         )
-        itinerary_payload = await self._build_itinerary(constraints, pois, correlation_id)
+        itinerary_payload = await self._build_itinerary(
+            constraints,
+            pois,
+            correlation_id,
+            task.session_id,
+        )
 
         itinerary = dict(itinerary_payload.get("itinerary") or {})
         itinerary_meta = dict(itinerary.get("metadata") or {})
@@ -250,6 +255,7 @@ class PlanningAgent(BaseAgent):
                 "session_id": session_id,
             },
             correlation_id=correlation_id,
+            session_id=session_id,
         )
         self._trace(
             "poi_search_stage",
@@ -281,6 +287,7 @@ class PlanningAgent(BaseAgent):
         constraints: TripConstraints,
         pois: list[dict[str, Any]],
         correlation_id: str,
+        session_id: str | None,
     ) -> dict[str, Any]:
         assert self.gateway is not None
         traveler_constraints = {
@@ -322,6 +329,7 @@ class PlanningAgent(BaseAgent):
             "build_itinerary",
             params,
             correlation_id=correlation_id,
+            session_id=session_id,
         )
         self._trace(
             "itinerary_builder_stage",

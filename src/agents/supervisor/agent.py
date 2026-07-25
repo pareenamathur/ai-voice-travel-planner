@@ -805,10 +805,6 @@ def _format_approved_itinerary_response(itinerary: dict[str, Any], constraints: 
     ]
 
     metadata = itinerary.get("metadata") or {}
-    if metadata.get("live_poi_lookup") is False and metadata.get("user_note"):
-        lines.append("")
-        lines.append(str(metadata["user_note"]))
-
     sources = _format_sources_blurb(itinerary)
     if sources:
         lines.append("")

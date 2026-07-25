@@ -83,9 +83,12 @@ class RecordingGateway(MCPGateway):
         tool_name: str,
         params: dict[str, Any],
         correlation_id: str = "",
+        session_id: str | None = None,
     ) -> Any:
         self.calls.append((role, tool_name, params))
-        return await super().invoke(role, tool_name, params, correlation_id)
+        return await super().invoke(
+            role, tool_name, params, correlation_id, session_id=session_id
+        )
 
     async def _search_pois(self, **kwargs: Any) -> dict[str, Any]:
         return {"source": "osm", "pois": list(SAMPLE_POIS), "live_poi_lookup": True}

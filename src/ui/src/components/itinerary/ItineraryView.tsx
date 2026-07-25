@@ -1,6 +1,12 @@
 import type { Itinerary } from "../../types/itinerary";
 import { DayCard } from "./DayCard";
 import { collectSourceLinks } from "../sources/sourceLinks";
+import {
+  groundingWarningMessage,
+  needsGroundingWarning,
+  PlaceSourceStatus,
+  resolvePlaceSourceStatus,
+} from "../sources/placeSourceStatus";
 import { SourceLinksList } from "../sources/SourceLinksList";
 import "./itinerary.css";
 
@@ -37,7 +43,8 @@ export function ItineraryView({ itinerary }: ItineraryViewProps) {
     (a, b) => a.day_number - b.day_number,
   );
   const sourceLinks = collectSourceLinks(itinerary);
-  const liveLookup = itinerary.metadata?.live_poi_lookup;
+  const placeSourceStatus = resolvePlaceSourceStatus(itinerary);
+  const showGroundingWarning = needsGroundingWarning(itinerary);
 
   return (
     <section
@@ -56,11 +63,13 @@ export function ItineraryView({ itinerary }: ItineraryViewProps) {
         </div>
       </header>
 
-      {liveLookup === false ? (
+      {showGroundingWarning ? (
         <p className="itinerary-view__fallback-note" data-testid="itinerary-fallback-note">
-          This itinerary uses trusted travel guidance instead of live map data.
+          {groundingWarningMessage(itinerary)}
         </p>
       ) : null}
+
+      {placeSourceStatus ? <PlaceSourceStatus status={placeSourceStatus} /> : null}
 
       {days.length === 0 ? (
         <p className="itinerary-view__empty" data-testid="itinerary-empty">

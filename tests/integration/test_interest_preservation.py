@@ -24,9 +24,11 @@ class InterestAwareGateway(MCPGateway):
         self.register("search_pois", self._search_pois)
         self.register("build_itinerary", self._build_itinerary)
 
-    async def invoke(self, role, tool_name, params, correlation_id=""):
+    async def invoke(self, role, tool_name, params, correlation_id="", session_id=None):
         self.calls.append((role, tool_name, params))
-        return await super().invoke(role, tool_name, params, correlation_id)
+        return await super().invoke(
+            role, tool_name, params, correlation_id, session_id=session_id
+        )
 
     async def _search_pois(self, **kwargs):
         interests = kwargs.get("interests") or []

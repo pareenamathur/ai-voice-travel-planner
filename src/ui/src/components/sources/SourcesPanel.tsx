@@ -1,6 +1,7 @@
 import type { Citation, Itinerary } from "../../types/itinerary";
 import { CitationCard } from "./CitationCard";
 import { collectCitations } from "./collectCitations";
+import { PlaceSourceStatus, resolvePlaceSourceStatus } from "./placeSourceStatus";
 import "./sources.css";
 
 export interface SourcesPanelProps {
@@ -33,6 +34,7 @@ export function SourcesPanel({ itinerary, citations }: SourcesPanelProps) {
   const items = itinerary
     ? collectCitations(itinerary)
     : dedupeCitations(citations ?? []);
+  const placeSourceStatus = itinerary ? resolvePlaceSourceStatus(itinerary) : null;
 
   return (
     <section
@@ -46,6 +48,10 @@ export function SourcesPanel({ itinerary, citations }: SourcesPanelProps) {
           {items.length} {items.length === 1 ? "source" : "sources"}
         </p>
       </header>
+
+      {placeSourceStatus ? (
+        <PlaceSourceStatus status={placeSourceStatus} testId="sources-place-status" />
+      ) : null}
 
       {items.length === 0 ? (
         <p className="sources-panel__empty" data-testid="sources-empty">

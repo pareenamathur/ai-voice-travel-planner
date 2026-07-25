@@ -301,7 +301,7 @@ async def test_confirm_phase_transitions_to_plan_with_speech_variants(
 
 
 @pytest.mark.asyncio
-async def test_approved_response_includes_live_poi_unavailable_note(
+async def test_approved_response_omits_curated_fallback_note_from_chat(
     sessions: SessionManager,
     obs: Observability,
 ):
@@ -314,6 +314,8 @@ async def test_approved_response_includes_live_poi_unavailable_note(
                 "days": [{"day_number": 1, "activities": [{"title": "City Palace"}]}],
                 "metadata": {
                     "live_poi_lookup": False,
+                    "live_poi_count": 0,
+                    "curated_poi_count": 3,
                     "user_note": LIVE_POI_UNAVAILABLE_NOTE,
                 },
             },
@@ -332,6 +334,8 @@ async def test_approved_response_includes_live_poi_unavailable_note(
                 "days": [{"day_number": 1, "activities": [{"title": "City Palace"}]}],
                 "metadata": {
                     "live_poi_lookup": False,
+                    "live_poi_count": 0,
+                    "curated_poi_count": 3,
                     "user_note": LIVE_POI_UNAVAILABLE_NOTE,
                 },
             },
@@ -351,8 +355,11 @@ async def test_approved_response_includes_live_poi_unavailable_note(
     confirm = await supervisor.handle_message(None, "Plan a 2-day trip to Jaipur")
     plan = await supervisor.handle_message(confirm["session_id"], "yes")
 
-    assert LIVE_POI_UNAVAILABLE_NOTE in plan["response"]
-    assert "temporarily limited" in plan["response"]
+    assert LIVE_POI_UNAVAILABLE_NOTE not in plan["response"]
+    assert "temporarily limited" not in plan["response"].lower()
+    session = sessions.read(confirm["session_id"])
+    assert session.itinerary is not None
+    assert session.itinerary["metadata"]["user_note"] == LIVE_POI_UNAVAILABLE_NOTE
 
 
 @pytest.mark.asyncio

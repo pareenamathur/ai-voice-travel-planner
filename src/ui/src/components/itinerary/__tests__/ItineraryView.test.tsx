@@ -11,6 +11,40 @@ import {
   sparseOptionalFieldsItinerary,
 } from "./fixtures";
 
+const curatedFallbackItinerary: typeof oneDayItinerary = {
+  ...oneDayItinerary,
+  metadata: {
+    live_poi_lookup: false,
+    live_poi_count: 0,
+    curated_poi_count: 2,
+    user_note:
+      "Live map verification is temporarily limited. Some suggestions are from the curated fallback catalogue.",
+  },
+  poi_registry: [
+    {
+      poi_id: "well_known/jaipur-city-palace",
+      name: "City Palace",
+      latitude: 26.9258,
+      longitude: 75.8236,
+      source: "well_known",
+      category: "culture",
+    },
+  ],
+};
+
+const groundingFailureItinerary: typeof emptyItinerary = {
+  city: "jaipur",
+  total_days: 2,
+  metadata: {
+    live_poi_lookup: false,
+    live_poi_count: 0,
+    curated_poi_count: 0,
+    user_note:
+      "Live map verification is temporarily limited. Some suggestions are from the curated fallback catalogue.",
+  },
+  days: [],
+};
+
 describe("ItineraryView", () => {
   it("renders empty itinerary state when itinerary prop is null", () => {
     render(<ItineraryView itinerary={null} />);
@@ -170,5 +204,40 @@ describe("ItineraryView", () => {
     );
     expect(schemaCompatibleItinerary.traveler_constraints?.pace).toBe("relaxed");
     expect(schemaCompatibleItinerary.metadata?.schema_version).toBe("1.0");
+  });
+
+  it("shows curated place source in the sources area without a prominent fallback banner", () => {
+    render(<ItineraryView itinerary={curatedFallbackItinerary} />);
+
+    expect(screen.getByTestId("place-source-status")).toHaveAttribute("data-kind", "curated");
+    expect(screen.getByTestId("place-source-status")).toHaveTextContent(
+      "Place source:",
+    );
+    expect(screen.getByTestId("place-source-status")).toHaveTextContent(
+      "Curated recommendations",
+    );
+    expect(screen.getByTestId("place-source-status")).toHaveTextContent(
+      "Live map verification was not available for this request.",
+    );
+    expect(screen.queryByTestId("itinerary-fallback-note")).not.toBeInTheDocument();
+    expect(screen.queryByText("Trusted travel guidance instead of live map data")).not
+      .toBeInTheDocument();
+  });
+
+  it("shows live place source when live POIs are present", () => {
+    render(<ItineraryView itinerary={oneDayItinerary} />);
+
+    expect(screen.getByTestId("place-source-status")).toHaveAttribute("data-kind", "live");
+    expect(screen.getByTestId("place-source-status")).toHaveTextContent("Live map data");
+    expect(screen.queryByTestId("itinerary-fallback-note")).not.toBeInTheDocument();
+  });
+
+  it("shows a prominent warning only for complete grounding failure", () => {
+    render(<ItineraryView itinerary={groundingFailureItinerary} />);
+
+    expect(screen.getByTestId("itinerary-fallback-note")).toHaveTextContent(
+      "temporarily limited",
+    );
+    expect(screen.queryByTestId("place-source-status")).not.toBeInTheDocument();
   });
 });

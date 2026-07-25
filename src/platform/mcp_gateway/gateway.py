@@ -64,20 +64,24 @@ class MCPGateway:
         tool_name: str,
         params: dict[str, Any],
         correlation_id: str = "",
+        session_id: str | None = None,
     ) -> Any:
         if tool_name not in self._handlers:
             raise ToolNotFoundError(tool_name)
         if not self.is_permitted(role, tool_name):
             raise PermissionDeniedError(role, tool_name)
 
+        resolved_session_id = _resolve_session_id(session_id, params)
         started = time.perf_counter()
         if self._observability:
             self._observability.record_span(
-                agent="mcp_gateway",
-                event="tool_call_start",
-                tool=tool_name,
-                role=role.value,
-                correlation_id=correlation_id,
+                **_gateway_span_fields(
+                    event="tool_call_start",
+                    tool=tool_name,
+                    role=role.value,
+                    correlation_id=correlation_id,
+                    session_id=resolved_session_id,
+                )
             )
 
         try:
@@ -85,24 +89,28 @@ class MCPGateway:
         except Exception as exc:
             if self._observability:
                 self._observability.record_span(
-                    agent="mcp_gateway",
-                    event="tool_call_error",
-                    tool=tool_name,
-                    role=role.value,
-                    correlation_id=correlation_id,
-                    error=str(exc),
-                    duration_ms=round((time.perf_counter() - started) * 1000, 2),
+                    **_gateway_span_fields(
+                        event="tool_call_error",
+                        tool=tool_name,
+                        role=role.value,
+                        correlation_id=correlation_id,
+                        session_id=resolved_session_id,
+                        error=str(exc),
+                        duration_ms=round((time.perf_counter() - started) * 1000, 2),
+                    )
                 )
             raise
 
         if self._observability:
             self._observability.record_span(
-                agent="mcp_gateway",
-                event="tool_call_complete",
-                tool=tool_name,
-                role=role.value,
-                correlation_id=correlation_id,
-                duration_ms=round((time.perf_counter() - started) * 1000, 2),
+                **_gateway_span_fields(
+                    event="tool_call_complete",
+                    tool=tool_name,
+                    role=role.value,
+                    correlation_id=correlation_id,
+                    session_id=resolved_session_id,
+                    duration_ms=round((time.perf_counter() - started) * 1000, 2),
+                )
             )
         return result
 
@@ -115,3 +123,38 @@ class MCPGateway:
             for name, roles in self._permissions.items()
             if role in roles and name in self._handlers
         )
+
+
+def _resolve_session_id(
+    session_id: str | None,
+    params: dict[str, Any],
+) -> str | None:
+    """Prefer explicit invoke kwarg; fall back to tool params when agents pass it there."""
+    if isinstance(session_id, str) and session_id.strip():
+        return session_id.strip()
+    raw = params.get("session_id")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return None
+
+
+def _gateway_span_fields(
+    *,
+    event: str,
+    tool: str,
+    role: str,
+    correlation_id: str,
+    session_id: str | None,
+    **extra: Any,
+) -> dict[str, Any]:
+    fields: dict[str, Any] = {
+        "agent": "mcp_gateway",
+        "event": event,
+        "tool": tool,
+        "role": role,
+        "correlation_id": correlation_id,
+        **extra,
+    }
+    if session_id:
+        fields["session_id"] = session_id
+    return fields

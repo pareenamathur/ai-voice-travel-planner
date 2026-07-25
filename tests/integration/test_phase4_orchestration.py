@@ -144,9 +144,18 @@ class RecordingGateway(MCPGateway):
             "citations": [],
         }
 
-    async def invoke(self, role, tool_name, params, correlation_id=""):  # type: ignore[no-untyped-def]
+    async def invoke(
+        self,
+        role,
+        tool_name,
+        params,
+        correlation_id="",
+        session_id=None,
+    ):  # type: ignore[no-untyped-def]
         self.calls.append((tool_name, params))
-        return await super().invoke(role, tool_name, params, correlation_id)
+        return await super().invoke(
+            role, tool_name, params, correlation_id, session_id=session_id
+        )
 
     async def _search_pois(self, **kwargs: Any) -> dict[str, Any]:
         return {"source": "osm", "pois": list(SAMPLE_POIS)}
